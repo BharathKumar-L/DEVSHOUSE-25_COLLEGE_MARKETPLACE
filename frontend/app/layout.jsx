@@ -1,9 +1,15 @@
 import { Inter } from "next/font/google"
 import "./globals.css"
-import Navbar from "@/components/navbar"
 import { AuthProvider } from "@/context/auth-context"
+import Navbar from "@/components/navbar"
 
 const inter = Inter({ subsets: ["latin"] })
+
+export const metadata = {
+  title: "College Marketplace",
+  description: "Buy and sell items within your college community",
+  generator: "v0.dev"
+}
 
 export default function RootLayout({ children }) {
   return (
@@ -11,17 +17,9 @@ export default function RootLayout({ children }) {
       <body className={inter.className}>
         <AuthProvider>
           <Navbar />
-          <main className="min-h-screen bg-yellow-50 pt-16">{children}</main>
+          <main className="mt-16">{children}</main>
         </AuthProvider>
       </body>
     </html>
   )
 }
-
-
-
-import './globals.css'
-
-export const metadata = {
-      generator: 'v0.dev'
-    };

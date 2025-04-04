@@ -1,185 +1,227 @@
 "use client"
 
 import { useState } from "react"
-import { X, Plus } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/context/auth-context"
 
-export default function SellItemPage() {
-  const [title, setTitle] = useState("")
-  const [description, setDescription] = useState("")
-  const [price, setPrice] = useState("")
-  const [category, setCategory] = useState("")
-  const [images, setImages] = useState([])
-  const [previewImages, setPreviewImages] = useState([])
+export default function SellPage() {
+  const router = useRouter()
+  const { user } = useAuth()
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    price: "",
+    category: "",
+    condition: "new",
+    images: [],
+  })
   const [error, setError] = useState("")
-  const [success, setSuccess] = useState("")
 
-  const CATEGORIES = ["Books", "Electronics", "Furniture", "Clothing", "Appliances", "Sports", "Other"]
-
-  const handleImageChange = (e) => {
-    const files = Array.from(e.target.files)
-
-    if (files.length + images.length > 5) {
-      setError("You can upload a maximum of 5 images")
-      return
-    }
-
-    setImages([...images, ...files])
-
-    // Create preview URLs
-    const newPreviewImages = files.map((file) => URL.createObjectURL(file))
-    setPreviewImages([...previewImages, ...newPreviewImages])
-
-    setError("")
-  }
-
-  const removeImage = (index) => {
-    const newImages = [...images]
-    const newPreviewImages = [...previewImages]
-
-    // Revoke the URL to avoid memory leaks
-    URL.revokeObjectURL(newPreviewImages[index])
-
-    newImages.splice(index, 1)
-    newPreviewImages.splice(index, 1)
-
-    setImages(newImages)
-    setPreviewImages(newPreviewImages)
-  }
-
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-
-    // Basic validation
-    if (!title || !description || !price || !category) {
-      setError("Please fill in all required fields")
-      return
-    }
-
-    if (images.length === 0) {
-      setError("Please upload at least one image")
-      return
-    }
-
-    // In a real app, this would submit the form data to a backend
     setError("")
-    setSuccess("Your item has been listed successfully!")
 
-    // Reset form after submission
-    setTimeout(() => {
-      setTitle("")
-      setDescription("")
-      setPrice("")
-      setCategory("")
-      setImages([])
-      setPreviewImages([])
-      setSuccess("")
-    }, 3000)
+    try {
+      // Here you would typically make an API call to create the listing
+      console.log("Creating listing:", formData)
+      router.push("/dashboard")
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  const handleImageUpload = (e) => {
+    const files = Array.from(e.target.files)
+    setFormData((prev) => ({
+      ...prev,
+      images: [...prev.images, ...files],
+    }))
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mx-auto max-w-2xl">
-        <h1 className="mb-8 text-center text-4xl font-black">SELL YOUR ITEM</h1>
+    <div className="min-h-screen bg-gray-50 py-12">
+      <div className="container mx-auto px-4">
+        <div className="mx-auto max-w-2xl">
+          <h1 className="mb-8 text-3xl font-bold text-gray-900">List a New Item</h1>
 
-        <form onSubmit={handleSubmit} className="neo-brutalism bg-white p-8">
-          {/* Title */}
-          <div className="mb-6">
-            <label className="mb-2 block text-lg font-bold">Title*</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="What are you selling?"
-              className="neo-brutalism-input w-full"
-              required
-            />
-          </div>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div className="rounded-md bg-red-50 p-4">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            )}
 
-          {/* Description */}
-          <div className="mb-6">
-            <label className="mb-2 block text-lg font-bold">Description*</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe your item, condition, etc."
-              className="neo-brutalism-input h-32 w-full resize-none"
-              required
-            />
-          </div>
+            <div>
+              <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+                Title
+              </label>
+              <input
+                type="text"
+                id="title"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                required
+              />
+            </div>
 
-          {/* Price */}
-          <div className="mb-6">
-            <label className="mb-2 block text-lg font-bold">Price ($)*</label>
-            <input
-              type="number"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder="0.00"
-              min="0"
-              step="0.01"
-              className="neo-brutalism-input w-full"
-              required
-            />
-          </div>
+            <div>
+              <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+                Description
+              </label>
+              <textarea
+                id="description"
+                rows={4}
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                required
+              />
+            </div>
 
-          {/* Category */}
-          <div className="mb-6">
-            <label className="mb-2 block text-lg font-bold">Category*</label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="neo-brutalism-input w-full"
-              required
-            >
-              <option value="">Select a category</option>
-              {CATEGORIES.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Image Upload */}
-          <div className="mb-6">
-            <label className="mb-2 block text-lg font-bold">Images* (Max 5)</label>
-            <div className="grid grid-cols-3 gap-4 sm:grid-cols-5">
-              {/* Image Previews */}
-              {previewImages.map((src, index) => (
-                <div key={index} className="relative h-24 w-full overflow-hidden rounded border-2 border-black">
-                  <img
-                    src={src || "/placeholder.svg"}
-                    alt={`Preview ${index}`}
-                    className="h-full w-full object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeImage(index)}
-                    className="absolute right-1 top-1 rounded-full bg-white p-1"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-
-              {/* Upload Button */}
-              {images.length < 5 && (
-                <label className="flex h-24 w-full cursor-pointer flex-col items-center justify-center border-4 border-dashed border-black bg-gray-50">
-                  <Plus className="h-8 w-8" />
-                  <span className="mt-1 text-sm font-bold">Add Image</span>
-                  <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" multiple />
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              <div>
+                <label htmlFor="price" className="block text-sm font-medium text-gray-700">
+                  Price ($)
                 </label>
+                <input
+                  type="number"
+                  id="price"
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="category" className="block text-sm font-medium text-gray-700">
+                  Category
+                </label>
+                <select
+                  id="category"
+                  value={formData.category}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                  required
+                >
+                  <option value="">Select a category</option>
+                  <option value="books">Books</option>
+                  <option value="electronics">Electronics</option>
+                  <option value="furniture">Furniture</option>
+                  <option value="clothing">Clothing</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="condition" className="block text-sm font-medium text-gray-700">
+                Condition
+              </label>
+              <select
+                id="condition"
+                value={formData.condition}
+                onChange={(e) => setFormData({ ...formData, condition: e.target.value })}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                required
+              >
+                <option value="new">New</option>
+                <option value="like-new">Like New</option>
+                <option value="good">Good</option>
+                <option value="fair">Fair</option>
+                <option value="poor">Poor</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Images</label>
+              <div className="mt-1 flex justify-center rounded-md border-2 border-dashed border-gray-300 px-6 pt-5 pb-6">
+                <div className="space-y-1 text-center">
+                  <svg
+                    className="mx-auto h-12 w-12 text-gray-400"
+                    stroke="currentColor"
+                    fill="none"
+                    viewBox="0 0 48 48"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <div className="flex text-sm text-gray-600">
+                    <label
+                      htmlFor="file-upload"
+                      className="relative cursor-pointer rounded-md bg-white font-medium text-blue-600 focus-within:outline-none focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-2 hover:text-blue-500"
+                    >
+                      <span>Upload files</span>
+                      <input
+                        id="file-upload"
+                        name="file-upload"
+                        type="file"
+                        className="sr-only"
+                        multiple
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                      />
+                    </label>
+                    <p className="pl-1">or drag and drop</p>
+                  </div>
+                  <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                </div>
+              </div>
+              {formData.images.length > 0 && (
+                <div className="mt-4 grid grid-cols-4 gap-4">
+                  {formData.images.map((image, index) => (
+                    <div key={index} className="relative">
+                      <img
+                        src={URL.createObjectURL(image)}
+                        alt={`Preview ${index + 1}`}
+                        className="h-24 w-full rounded-md object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormData({
+                            ...formData,
+                            images: formData.images.filter((_, i) => i !== index),
+                          })
+                        }
+                        className="absolute -right-2 -top-2 rounded-full bg-red-500 p-1 text-white"
+                      >
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
-          </div>
 
-          {error && <p className="mb-4 font-bold text-red-500">{error}</p>}
-          {success && <p className="mb-4 font-bold text-green-600">{success}</p>}
-
-          <button type="submit" className="neo-brutalism-button w-full bg-neo-green text-lg font-black text-white">
-            LIST ITEM FOR SALE
-          </button>
-        </form>
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              >
+                List Item
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   )
