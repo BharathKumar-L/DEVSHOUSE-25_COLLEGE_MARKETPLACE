@@ -22,7 +22,7 @@
     <h2>Installation & Setup</h2>
     <pre>
 1.Clone the repository:
-git clone https://github.com/yourusername/college-marketplace.git.
+git clone https://github.com/yourusername/college-marketplace.git <br>
 
 2.Navigate to the frontend directory:
     cd DEVSHOUSE-25_COLLEGE_MARKETPLACE/frontend
