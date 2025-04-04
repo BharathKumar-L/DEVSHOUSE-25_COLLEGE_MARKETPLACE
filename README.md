@@ -13,30 +13,28 @@
         <li>Location-Based Search</li>
         <li>Admin Panel</li>
     </ul>
-    <h2>Tech Stack</h2>
+    <h2>Tech Stack:</h2>
     <ul>
         <li><strong>Frontend:</strong> Next.js, Lucide React, Radix UI, Tailwind CSS</li>
         <li><strong>Backend:</strong> Go</li>
         <li><strong>Database:</strong> PostgreSQL</li>
-        <li><strong>Authentication:</strong> Google OAuth</li>
     </ul>
     <h2>Installation & Setup</h2>
     <pre>
-1.  Clone the repository:
-    git clone https://github.com/yourusername/college-marketplace.git
+    1.Clone the repository:
+        git clone https://github.com/yourusername/college-marketplace.git
 
-2.  Navigate to the frontend directory:
-    cd DEVSHOUSE-25_COLLEGE_MARKETPLACE/frontend
+    2.Navigate to the frontend directory:
+        cd DEVSHOUSE-25_COLLEGE_MARKETPLACE/frontend
 
-3.  Install frontend dependencies:
-    npm install
+    3.Install frontend dependencies:
+        npm install
 
-4.  Run the development server:
-    npm run dev
+    4.  Run the development server:
+        npm run dev
 
-5.  Open http://localhost:3000 to view the app in the browser.
-    </pre>
-
+    5.Open http://localhost:3000 to view the app in the browser.
+ </pre>
     <h2>Contributing</h2>
     <ul>
         <li>Fork the repository.</li>
@@ -45,8 +43,7 @@
         <li>Push to the branch: <code>git push origin feature-branch</code>.</li>
         <li>Open a pull request.</li>
     </ul>
-
     <div class="footer">
-        <p>For any queries or contributions, feel free to reach out at <a href="mailto:collegemarketplace25@gmail.com" style="color: white;">collegemarketplace25@gmail.com</a></p>
+        <p>For any queries or contributions, feel free to reach out at <a href="mailto:collegemarketplace25@gmail.com" style="color: red;">collegemarketplace25@gmail.com</a></p>
     </div>
 </div>
