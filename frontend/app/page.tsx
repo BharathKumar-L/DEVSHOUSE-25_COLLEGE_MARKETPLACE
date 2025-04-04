@@ -7,12 +7,6 @@ import { Menu } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/context/auth-context"
 
-interface Filters {
-  category?: string
-  priceRange?: { min: number; max: number }
-  condition?: string
-}
-
 // Sample product data
 const PRODUCTS = [
   {
@@ -76,7 +70,7 @@ export default function Home() {
   const [showFilters, setShowFilters] = useState(false)
   const [filteredProducts, setFilteredProducts] = useState(PRODUCTS)
 
-  const handleFilterChange = (filters: Filters) => {
+  const handleFilterChange = (filters) => {
     // In a real app, this would filter based on the selected criteria
     console.log("Filters applied:", filters)
     // For demo purposes, we're just using the original products
