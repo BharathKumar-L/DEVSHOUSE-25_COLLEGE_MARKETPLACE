@@ -21,19 +21,19 @@
     </ul>
     <h2>Installation & Setup</h2>
     <pre>
-    1.Clone the repository:
-        git clone https://github.com/yourusername/college-marketplace.git
+1.Clone the repository:
+    git clone https://github.com/yourusername/college-marketplace.git
 
-    2.Navigate to the frontend directory:
-        cd DEVSHOUSE-25_COLLEGE_MARKETPLACE/frontend
+2.Navigate to the frontend directory:
+    cd DEVSHOUSE-25_COLLEGE_MARKETPLACE/frontend
 
-    3.Install frontend dependencies:
-        npm install
+3.Install frontend dependencies:
+    npm install
 
-    4.  Run the development server:
-        npm run dev
+4.Run the development server:
+    npm run dev
 
-    5.Open http://localhost:3000 to view the app in the browser.
+5.Open http://localhost:3000 to view the app in the web browser.
  </pre>
     <h2>Contributing</h2>
     <ul>
