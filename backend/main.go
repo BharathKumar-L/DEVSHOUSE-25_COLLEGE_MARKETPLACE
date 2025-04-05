@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"college-marketplace/db"
+	"college-marketplace/handlers"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -44,9 +45,34 @@ func main() {
 	r.Use(cors.New(config))
 
 	// Define routes
-	r.POST("/api/send-otp", sendOTP)
-	r.POST("/api/verify-otp", verifyOTP)
-	r.POST("/api/register", registerUser)
+	api := r.Group("/api")
+	{
+		// Auth routes
+		api.POST("/send-otp", sendOTP)
+		api.POST("/verify-otp", verifyOTP)
+		api.POST("/register", handlers.RegisterUser)
+		api.POST("/login", handlers.LoginUser)
+
+		// User routes
+		api.GET("/users/:id", handlers.GetUserProfile)
+		api.PUT("/users/:id", handlers.UpdateUserProfile)
+
+		// Product routes
+		api.POST("/products", handlers.CreateProduct)
+		api.GET("/products", handlers.GetProducts)
+		api.GET("/products/:id", handlers.GetProduct)
+		api.PUT("/products/:id", handlers.UpdateProduct)
+		api.DELETE("/products/:id", handlers.DeleteProduct)
+
+		// Chat routes
+		api.POST("/chats", handlers.CreateChat)
+		api.GET("/chats/:id", handlers.GetChat)
+		api.GET("/chats/user/:userId", handlers.GetUserChats)
+
+		// Message routes
+		api.POST("/messages", handlers.CreateMessage)
+		api.GET("/messages/:chatId", handlers.GetChatMessages)
+	}
 
 	// Start server
 	port := os.Getenv("PORT")
@@ -147,18 +173,6 @@ func verifyOTP(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "OTP verified successfully"})
 }
 
-func registerUser(c *gin.Context) {
-	var user User
-	if err := c.ShouldBindJSON(&user); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Here you would typically save the user to a database
-	// For now, we'll just return success
-	c.JSON(http.StatusOK, gin.H{"message": "User registered successfully"})
-}
-
 func generateOTP() string {
 	// Generate a 6-digit random number between 100000 and 999999
 	otp := 100000 + time.Now().UnixNano()%900000
@@ -171,22 +185,42 @@ func sendEmail(to, otp string) error {
 	smtpHost := os.Getenv("SMTP_HOST")
 	smtpPort := "587"
 
+	// Validate environment variables
+	if from == "" || password == "" || smtpHost == "" {
+		log.Printf("❌ Missing email configuration: SMTP_EMAIL=%v, SMTP_HOST=%v, SMTP_PASSWORD=%v",
+			from != "", smtpHost != "", password != "")
+		return fmt.Errorf("missing email configuration")
+	}
+
 	// Message
 	subject := "Your OTP for College Marketplace"
-	body := fmt.Sprintf("Your OTP is: %s\n\nThis OTP will expire in 10 minutes.", otp)
-	message := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n%s", from, to, subject, body)
+	body := fmt.Sprintf(`
+Hello!
+
+Your OTP for College Marketplace is: %s
+
+This OTP will expire in 10 minutes.
+
+Best regards,
+College Marketplace Team
+`, otp)
+
+	message := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s",
+		from, to, subject, body)
 
 	// Authentication
 	auth := smtp.PlainAuth("", from, password, smtpHost)
 
 	// Send email
-	log.Printf("Attempting to send email to: %s", to)
+	log.Printf("📧 Attempting to send email to: %s", to)
+	log.Printf("📧 Using SMTP server: %s:%s", smtpHost, smtpPort)
+
 	err := smtp.SendMail(smtpHost+":"+smtpPort, auth, from, []string{to}, []byte(message))
 	if err != nil {
-		log.Printf("Failed to send email: %v", err)
+		log.Printf("❌ Failed to send email: %v", err)
 		return fmt.Errorf("failed to send email: %v", err)
 	}
 
-	log.Println("Email sent successfully")
+	log.Printf("✅ Email sent successfully to: %s", to)
 	return nil
 }

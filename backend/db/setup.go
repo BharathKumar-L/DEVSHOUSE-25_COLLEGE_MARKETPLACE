@@ -12,6 +12,13 @@ import (
 var DB *sql.DB
 
 func InitDB() error {
+	// Log environment variables (without sensitive data)
+	log.Printf("Database Configuration:")
+	log.Printf("Host: %s", os.Getenv("DB_HOST"))
+	log.Printf("Port: %s", os.Getenv("DB_PORT"))
+	log.Printf("User: %s", os.Getenv("DB_USER"))
+	log.Printf("Database: %s", os.Getenv("DB_NAME"))
+
 	// Database connection string
 	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		os.Getenv("DB_HOST"),
@@ -39,8 +46,19 @@ func InitDB() error {
 
 	log.Printf("✅ Successfully connected to PostgreSQL database '%s'", os.Getenv("DB_NAME"))
 
-	// Create database if it doesn't exist
+	// Create tables if they don't exist
+	log.Printf("Creating database tables if they don't exist...")
 	_, err = DB.Exec(`
+		CREATE TABLE IF NOT EXISTS users (
+			id UUID PRIMARY KEY,
+			name VARCHAR(255) NOT NULL,
+			email VARCHAR(255) UNIQUE NOT NULL,
+			password_hash VARCHAR(255) NOT NULL,
+			college_id UUID,
+			is_admin BOOLEAN DEFAULT FALSE,
+			created_at TIMESTAMP NOT NULL
+		);
+
 		CREATE TABLE IF NOT EXISTS otp_verifications (
 			email VARCHAR(255) PRIMARY KEY,
 			otp VARCHAR(10) NOT NULL,
@@ -49,8 +67,8 @@ func InitDB() error {
 		);
 	`)
 	if err != nil {
-		log.Printf("❌ Failed to create otp_verifications table: %v", err)
-		return fmt.Errorf("error creating otp_verifications table: %v", err)
+		log.Printf("❌ Failed to create database tables: %v", err)
+		return fmt.Errorf("error creating database tables: %v", err)
 	}
 
 	log.Printf("✅ Successfully initialized database tables")
