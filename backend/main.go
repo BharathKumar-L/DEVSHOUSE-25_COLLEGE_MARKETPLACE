@@ -1,226 +1,442 @@
 package main
 
 import (
-	"database/sql"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"net/http"
-	"net/smtp"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
-	"college-marketplace/db"
-	"college-marketplace/handlers"
+	"marketplace/models"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"golang.org/x/crypto/bcrypt"
+	"gopkg.in/gomail.v2"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
-type User struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Name     string `json:"name"`
-	OTP      string `json:"otp"`
+type SignupRequest struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=6"`
+	Name     string `json:"name" binding:"required"`
 }
 
-func main() {
+type VerifyOTPRequest struct {
+	Email string `json:"email" binding:"required,email"`
+	OTP   string `json:"otp" binding:"required"`
+}
+
+type CheckEmailRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+type CreateProductRequest struct {
+	Title       string  `json:"title" binding:"required"`
+	Description string  `json:"description" binding:"required"`
+	Price       float64 `json:"price" binding:"required"`
+	Category    string  `json:"category" binding:"required"`
+	Condition   string  `json:"condition" binding:"required"`
+	ImageURL    string  `json:"imageUrl"`
+	Location    string  `json:"location"`
+	ContactInfo string  `json:"contactInfo"`
+}
+
+var db *gorm.DB
+var mailer *gomail.Dialer
+
+func init() {
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
 		log.Fatal("Error loading .env file")
 	}
 
 	// Initialize database
-	if err := db.InitDB(); err != nil {
-		log.Fatal("Error initializing database:", err)
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
+		os.Getenv("DB_HOST"),
+		os.Getenv("DB_USER"),
+		os.Getenv("DB_PASSWORD"),
+		os.Getenv("DB_NAME"),
+		os.Getenv("DB_PORT"),
+	)
+
+	var err error
+	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Fatal("Failed to connect to database:", err)
 	}
 
-	// Initialize Gin router
-	r := gin.Default()
+	// Auto migrate the schema
+	db.AutoMigrate(&models.User{}, &models.Product{})
 
-	// Configure CORS
-	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{"http://localhost:3000"} // Update with your frontend URL
-	config.AllowCredentials = true
-	r.Use(cors.New(config))
-
-	// Define routes
-	api := r.Group("/api")
-	{
-		// Auth routes
-		api.POST("/send-otp", sendOTP)
-		api.POST("/verify-otp", verifyOTP)
-		api.POST("/register", handlers.RegisterUser)
-		api.POST("/login", handlers.LoginUser)
-
-		// User routes
-		api.GET("/users/:id", handlers.GetUserProfile)
-		api.PUT("/users/:id", handlers.UpdateUserProfile)
-
-		// Product routes
-		api.POST("/products", handlers.CreateProduct)
-		api.GET("/products", handlers.GetProducts)
-		api.GET("/products/:id", handlers.GetProduct)
-		api.PUT("/products/:id", handlers.UpdateProduct)
-		api.DELETE("/products/:id", handlers.DeleteProduct)
-
-		// Chat routes
-		api.POST("/chats", handlers.CreateChat)
-		api.GET("/chats/:id", handlers.GetChat)
-		api.GET("/chats/user/:userId", handlers.GetUserChats)
-
-		// Message routes
-		api.POST("/messages", handlers.CreateMessage)
-		api.GET("/messages/:chatId", handlers.GetChatMessages)
-	}
-
-	// Start server
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-	log.Printf("🚀 Server starting on port %s", port)
-	if err := r.Run(":" + port); err != nil {
-		log.Fatal("Error starting server:", err)
-	}
+	// Initialize email dialer
+	mailer = gomail.NewDialer(
+		"smtp.gmail.com",
+		587,
+		os.Getenv("EMAIL_USER"),
+		os.Getenv("EMAIL_PASSWORD"),
+	)
 }
 
-func sendOTP(c *gin.Context) {
-	var user User
-	if err := c.ShouldBindJSON(&user); err != nil {
+func generateOTP() string {
+	bytes := make([]byte, 3)
+	rand.Read(bytes)
+	return hex.EncodeToString(bytes)
+}
+
+func sendOTPEmail(email, otp string) error {
+	log.Printf("Attempting to send OTP email to: %s", email)
+
+	// Verify email configuration
+	emailUser := os.Getenv("EMAIL_USER")
+	emailPass := os.Getenv("EMAIL_PASSWORD")
+
+	if emailUser == "" || emailPass == "" {
+		log.Printf("Email configuration missing. EMAIL_USER: %v, EMAIL_PASSWORD: %v",
+			emailUser != "", emailPass != "")
+		return fmt.Errorf("email configuration missing")
+	}
+
+	m := gomail.NewMessage()
+	m.SetHeader("From", emailUser)
+	m.SetHeader("To", email)
+	m.SetHeader("Subject", "Your OTP for Marketplace Signup")
+
+	body := fmt.Sprintf("Your OTP for signup is: %s\nThis OTP will expire in 10 minutes.", otp)
+	m.SetBody("text/plain", body)
+
+	// Create a new dialer for each email to ensure fresh connection
+	d := gomail.NewDialer("smtp.gmail.com", 587, emailUser, emailPass)
+
+	if err := d.DialAndSend(m); err != nil {
+		log.Printf("Error sending email: %v", err)
+		return fmt.Errorf("failed to send email: %v", err)
+	}
+
+	log.Printf("OTP email sent successfully to %s", email)
+	return nil
+}
+
+func signup(c *gin.Context) {
+	var req SignupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	// Check if user already exists
+	var existingUser models.User
+	if result := db.Where("email = ?", req.Email).First(&existingUser); result.Error == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "Email already registered"})
+		return
+	}
+
+	// Generate OTP
 	otp := generateOTP()
-	expiresAt := time.Now().Add(10 * time.Minute)
+	otpExpiry := time.Now().Add(10 * time.Minute)
 
-	// Update or insert the OTP
-	_, err := db.DB.Exec(`
-		INSERT INTO otp_verifications (email, otp, expires_at)
-		VALUES ($1, $2, $3)
-		ON CONFLICT (email) 
-		DO UPDATE SET otp = $2, expires_at = $3
-	`, user.Email, otp, expiresAt)
-
+	// Hash password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		log.Printf("❌ Failed to store OTP: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store OTP"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error processing password"})
 		return
 	}
 
-	log.Printf("✅ OTP stored successfully for email: %s", user.Email)
+	// Create user
+	user := models.User{
+		Email:      req.Email,
+		Password:   string(hashedPassword),
+		Name:       req.Name,
+		OTP:        otp,
+		OTPExpiry:  otpExpiry,
+		IsVerified: false,
+	}
 
-	// Send the OTP via email
-	if err := sendEmail(user.Email, otp); err != nil {
-		log.Printf("❌ Failed to send email: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send OTP email"})
+	if err := db.Create(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error creating user"})
 		return
 	}
 
-	log.Printf("✅ OTP sent successfully to email: %s", user.Email)
+	// Send OTP email
+	if err := sendOTPEmail(req.Email, otp); err != nil {
+		// If email fails, delete the user
+		db.Delete(&user)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error sending OTP email"})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "OTP sent successfully"})
 }
 
 func verifyOTP(c *gin.Context) {
-	var user User
-	if err := c.ShouldBindJSON(&user); err != nil {
+	var req VerifyOTPRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	log.Printf("🔍 Verifying OTP for email: %s", user.Email)
-	log.Printf("📝 Received OTP: %s", user.OTP)
+	var user models.User
+	if result := db.Where("email = ?", req.Email).First(&user); result.Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
 
-	// Query the database for the OTP
-	var storedOTP string
-	var expiresAt time.Time
-	err := db.DB.QueryRow(`
-		SELECT otp, expires_at
-		FROM otp_verifications
-		WHERE email = $1
-	`, user.Email).Scan(&storedOTP, &expiresAt)
+	if user.OTP != req.OTP {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid OTP"})
+		return
+	}
 
+	if time.Now().After(user.OTPExpiry) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "OTP has expired"})
+		return
+	}
+
+	// Update user verification status
+	user.IsVerified = true
+	user.OTP = "" // Clear the OTP after successful verification
+	if err := db.Save(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error updating user status"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Email verified successfully"})
+}
+
+func checkEmail(c *gin.Context) {
+	var req CheckEmailRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("Error binding JSON: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var user models.User
+	if result := db.Where("email = ?", req.Email).First(&user); result.Error != nil {
+		log.Printf("Email not found: %v", result.Error)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Email not found"})
+		return
+	}
+
+	// Return a simple JSON response
+	response := gin.H{
+		"exists":  true,
+		"message": "Email exists",
+	}
+
+	log.Printf("Sending response: %+v", response)
+	c.JSON(http.StatusOK, response)
+}
+
+func createProduct(c *gin.Context) {
+	var req CreateProductRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("Error binding JSON: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data. Please check all fields are correct."})
+		return
+	}
+
+	// Get user ID from session/token (you'll need to implement this)
+	userID := uint(1) // Temporary hardcoded user ID for testing
+
+	product := models.Product{
+		Title:       req.Title,
+		Description: req.Description,
+		Price:       req.Price,
+		Category:    req.Category,
+		Condition:   req.Condition,
+		ImageURL:    req.ImageURL,
+		UserID:      userID,
+		Location:    req.Location,
+		ContactInfo: req.ContactInfo,
+	}
+
+	if err := db.Create(&product).Error; err != nil {
+		log.Printf("Error creating product: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error creating product"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, product)
+}
+
+func getUserProducts(c *gin.Context) {
+	// Get user ID from session/token (you'll need to implement this)
+	userID := uint(1) // Temporary hardcoded user ID for testing
+
+	var products []models.Product
+	if err := db.Where("user_id = ?", userID).Find(&products).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching products"})
+		return
+	}
+
+	c.JSON(http.StatusOK, products)
+}
+
+func getProduct(c *gin.Context) {
+	id := c.Param("id")
+
+	var product models.Product
+	if result := db.First(&product, id); result.Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, product)
+}
+
+func updateProduct(c *gin.Context) {
+	id := c.Param("id")
+
+	var product models.Product
+	if result := db.First(&product, id); result.Error != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+		return
+	}
+
+	var req CreateProductRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Update product fields
+	product.Title = req.Title
+	product.Description = req.Description
+	product.Price = req.Price
+	product.Category = req.Category
+	product.Condition = req.Condition
+	product.ImageURL = req.ImageURL
+	product.Location = req.Location
+	product.ContactInfo = req.ContactInfo
+
+	if err := db.Save(&product).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error updating product"})
+		return
+	}
+
+	c.JSON(http.StatusOK, product)
+}
+
+func deleteProduct(c *gin.Context) {
+	id := c.Param("id")
+	log.Printf("Attempting to delete product with ID: %s", id)
+
+	var product models.Product
+	if result := db.First(&product, id); result.Error != nil {
+		log.Printf("Error finding product: %v", result.Error)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+		return
+	}
+
+	// Log the product details before deletion
+	log.Printf("Found product to delete: %+v", product)
+
+	if err := db.Delete(&product).Error; err != nil {
+		log.Printf("Error deleting product: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Error deleting product: %v", err)})
+		return
+	}
+
+	log.Printf("Successfully deleted product with ID: %s", id)
+	c.Header("Content-Type", "application/json")
+	c.JSON(http.StatusOK, gin.H{"message": "Product deleted successfully"})
+}
+
+func uploadImage(c *gin.Context) {
+	file, err := c.FormFile("image")
 	if err != nil {
-		if err == sql.ErrNoRows {
-			log.Printf("❌ No OTP found for email: %s", user.Email)
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "No OTP found for this email. Please request a new one."})
-		} else {
-			log.Printf("❌ Database error: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		log.Printf("Error getting file from form: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No file uploaded"})
+		return
+	}
+
+	// Generate unique filename
+	ext := filepath.Ext(file.Filename)
+	filename := fmt.Sprintf("%d%s", time.Now().UnixNano(), ext)
+
+	// Get absolute path for uploads directory
+	uploadsDir := "uploads"
+	absPath, err := filepath.Abs(uploadsDir)
+	if err != nil {
+		log.Printf("Error getting absolute path: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process upload path"})
+		return
+	}
+
+	// Ensure uploads directory exists
+	if err := os.MkdirAll(absPath, 0755); err != nil {
+		log.Printf("Error creating uploads directory: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create uploads directory"})
+		return
+	}
+
+	// Save the file
+	dst := filepath.Join(absPath, filename)
+	log.Printf("Saving file to: %s", dst)
+	if err := c.SaveUploadedFile(file, dst); err != nil {
+		log.Printf("Error saving file: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file"})
+		return
+	}
+
+	// Return the file path that can be used to access the image
+	imageURL := fmt.Sprintf("/uploads/%s", filename)
+	log.Printf("File saved successfully. URL: %s", imageURL)
+	c.JSON(http.StatusOK, gin.H{"imageUrl": imageURL})
+}
+
+func main() {
+	r := gin.Default()
+
+	// Configure CORS
+	config := cors.DefaultConfig()
+	config.AllowOrigins = []string{"http://localhost:3000"}
+	config.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
+	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
+	config.AllowCredentials = true
+
+	r.Use(cors.New(config))
+
+	// Create uploads directory if it doesn't exist
+	if err := os.MkdirAll("uploads", 0755); err != nil {
+		log.Fatal("Failed to create uploads directory:", err)
+	}
+
+	// Serve static files from the uploads directory with proper headers
+	r.Static("/uploads", "./uploads")
+	r.Use(func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, "/uploads/") {
+			c.Header("Cache-Control", "public, max-age=31536000")
 		}
-		return
+		c.Next()
+	})
+
+	// Auto migrate the schema
+	db.AutoMigrate(&models.User{}, &models.Product{})
+
+	// Routes
+	r.POST("/signup", signup)
+	r.POST("/verify-otp", verifyOTP)
+	r.POST("/check-email", checkEmail)
+
+	// Product routes
+	r.POST("/products", createProduct)
+	r.GET("/products/user", getUserProducts)
+	r.GET("/products/:id", getProduct)
+	r.PUT("/products/:id", updateProduct)
+	r.DELETE("/products/:id", deleteProduct)
+
+	// File upload route
+	r.POST("/upload", uploadImage)
+
+	// Start server
+	if err := r.Run(":8080"); err != nil {
+		log.Fatal("Failed to start server:", err)
 	}
-
-	log.Printf("✅ Found stored OTP: %s", storedOTP)
-	log.Printf("⏰ OTP expires at: %v", expiresAt)
-
-	// Check if OTP has expired
-	if time.Now().After(expiresAt) {
-		log.Printf("⚠️ OTP has expired for email: %s", user.Email)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "OTP has expired. Please request a new one."})
-		return
-	}
-
-	if storedOTP != user.OTP {
-		log.Printf("❌ OTP mismatch for %s", user.Email)
-		log.Printf("Expected: %s, Got: %s", storedOTP, user.OTP)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid OTP"})
-		return
-	}
-
-	log.Printf("✅ OTP verified successfully for email: %s", user.Email)
-	c.JSON(http.StatusOK, gin.H{"message": "OTP verified successfully"})
-}
-
-func generateOTP() string {
-	// Generate a 6-digit random number between 100000 and 999999
-	otp := 100000 + time.Now().UnixNano()%900000
-	return fmt.Sprintf("%06d", otp)
-}
-
-func sendEmail(to, otp string) error {
-	from := os.Getenv("SMTP_EMAIL")
-	password := os.Getenv("SMTP_PASSWORD")
-	smtpHost := os.Getenv("SMTP_HOST")
-	smtpPort := "587"
-
-	// Validate environment variables
-	if from == "" || password == "" || smtpHost == "" {
-		log.Printf("❌ Missing email configuration: SMTP_EMAIL=%v, SMTP_HOST=%v, SMTP_PASSWORD=%v",
-			from != "", smtpHost != "", password != "")
-		return fmt.Errorf("missing email configuration")
-	}
-
-	// Message
-	subject := "Your OTP for College Marketplace"
-	body := fmt.Sprintf(`
-Hello!
-
-Your OTP for College Marketplace is: %s
-
-This OTP will expire in 10 minutes.
-
-Best regards,
-College Marketplace Team
-`, otp)
-
-	message := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s",
-		from, to, subject, body)
-
-	// Authentication
-	auth := smtp.PlainAuth("", from, password, smtpHost)
-
-	// Send email
-	log.Printf("📧 Attempting to send email to: %s", to)
-	log.Printf("📧 Using SMTP server: %s:%s", smtpHost, smtpPort)
-
-	err := smtp.SendMail(smtpHost+":"+smtpPort, auth, from, []string{to}, []byte(message))
-	if err != nil {
-		log.Printf("❌ Failed to send email: %v", err)
-		return fmt.Errorf("failed to send email: %v", err)
-	}
-
-	log.Printf("✅ Email sent successfully to: %s", to)
-	return nil
 }
