@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -37,16 +38,12 @@ func main() {
 	r := gin.Default()
 
 	// Configure CORS
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
-	}))
+	config := cors.DefaultConfig()
+	config.AllowOrigins = []string{"http://localhost:3000"} // Update with your frontend URL
+	config.AllowCredentials = true
+	r.Use(cors.New(config))
 
-	// Routes
+	// Define routes
 	r.POST("/api/send-otp", sendOTP)
 	r.POST("/api/verify-otp", verifyOTP)
 	r.POST("/api/register", registerUser)
@@ -56,7 +53,10 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-	r.Run(":" + port)
+	log.Printf("🚀 Server starting on port %s", port)
+	if err := r.Run(":" + port); err != nil {
+		log.Fatal("Error starting server:", err)
+	}
 }
 
 func sendOTP(c *gin.Context) {
@@ -66,32 +66,33 @@ func sendOTP(c *gin.Context) {
 		return
 	}
 
-	// Generate OTP
 	otp := generateOTP()
-	log.Printf("Generated OTP: %s for email: %s", otp, user.Email)
-
-	// Store OTP in database with expiration
 	expiresAt := time.Now().Add(10 * time.Minute)
+
+	// Update or insert the OTP
 	_, err := db.DB.Exec(`
 		INSERT INTO otp_verifications (email, otp, expires_at)
 		VALUES ($1, $2, $3)
-		ON CONFLICT (email) DO UPDATE
-		SET otp = $2, created_at = CURRENT_TIMESTAMP, expires_at = $3
+		ON CONFLICT (email) 
+		DO UPDATE SET otp = $2, expires_at = $3
 	`, user.Email, otp, expiresAt)
+
 	if err != nil {
-		log.Printf("Failed to store OTP: %v", err)
+		log.Printf("❌ Failed to store OTP: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store OTP"})
 		return
 	}
 
-	// Send OTP via email
+	log.Printf("✅ OTP stored successfully for email: %s", user.Email)
+
+	// Send the OTP via email
 	if err := sendEmail(user.Email, otp); err != nil {
-		log.Printf("Failed to send email: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send OTP"})
+		log.Printf("❌ Failed to send email: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send OTP email"})
 		return
 	}
 
-	log.Printf("OTP sent successfully to %s", user.Email)
+	log.Printf("✅ OTP sent successfully to email: %s", user.Email)
 	c.JSON(http.StatusOK, gin.H{"message": "OTP sent successfully"})
 }
 
@@ -102,8 +103,8 @@ func verifyOTP(c *gin.Context) {
 		return
 	}
 
-	log.Printf("Verifying OTP for email: %s", user.Email)
-	log.Printf("Received OTP: %s", user.OTP)
+	log.Printf("🔍 Verifying OTP for email: %s", user.Email)
+	log.Printf("📝 Received OTP: %s", user.OTP)
 
 	// Query the database for the OTP
 	var storedOTP string
@@ -111,28 +112,38 @@ func verifyOTP(c *gin.Context) {
 	err := db.DB.QueryRow(`
 		SELECT otp, expires_at
 		FROM otp_verifications
-		WHERE email = $1 AND expires_at > CURRENT_TIMESTAMP
+		WHERE email = $1
 	`, user.Email).Scan(&storedOTP, &expiresAt)
 
 	if err != nil {
-		log.Printf("No valid OTP found for email: %s", user.Email)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "No valid OTP found for this email"})
+		if err == sql.ErrNoRows {
+			log.Printf("❌ No OTP found for email: %s", user.Email)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "No OTP found for this email. Please request a new one."})
+		} else {
+			log.Printf("❌ Database error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		}
+		return
+	}
+
+	log.Printf("✅ Found stored OTP: %s", storedOTP)
+	log.Printf("⏰ OTP expires at: %v", expiresAt)
+
+	// Check if OTP has expired
+	if time.Now().After(expiresAt) {
+		log.Printf("⚠️ OTP has expired for email: %s", user.Email)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "OTP has expired. Please request a new one."})
 		return
 	}
 
 	if storedOTP != user.OTP {
-		log.Printf("OTP mismatch for %s. Expected: %s, Got: %s", user.Email, storedOTP, user.OTP)
+		log.Printf("❌ OTP mismatch for %s", user.Email)
+		log.Printf("Expected: %s, Got: %s", storedOTP, user.OTP)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid OTP"})
 		return
 	}
 
-	// Delete the OTP after successful verification
-	_, err = db.DB.Exec("DELETE FROM otp_verifications WHERE email = $1", user.Email)
-	if err != nil {
-		log.Printf("Failed to delete OTP after verification: %v", err)
-	}
-
-	log.Printf("OTP verified successfully for email: %s", user.Email)
+	log.Printf("✅ OTP verified successfully for email: %s", user.Email)
 	c.JSON(http.StatusOK, gin.H{"message": "OTP verified successfully"})
 }
 
@@ -140,26 +151,6 @@ func registerUser(c *gin.Context) {
 	var user User
 	if err := c.ShouldBindJSON(&user); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Verify OTP first
-	var storedOTP string
-	err := db.DB.QueryRow(`
-		SELECT otp
-		FROM otp_verifications
-		WHERE email = $1 AND expires_at > CURRENT_TIMESTAMP
-	`, user.Email).Scan(&storedOTP)
-
-	if err != nil {
-		log.Printf("No valid OTP found for email: %s", user.Email)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "No valid OTP found for this email"})
-		return
-	}
-
-	if storedOTP != user.OTP {
-		log.Printf("OTP mismatch for %s. Expected: %s, Got: %s", user.Email, storedOTP, user.OTP)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid OTP"})
 		return
 	}
 

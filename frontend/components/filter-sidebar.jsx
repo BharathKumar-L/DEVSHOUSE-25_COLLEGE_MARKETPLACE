@@ -1,64 +1,146 @@
 "use client"
 
 import { useState } from "react"
-import { X, Check } from "lucide-react"
+import { X } from "lucide-react"
 
-const CATEGORIES = ["Books", "Electronics", "Furniture", "Clothing", "Appliances", "Sports", "Other"]
+const CATEGORIES = [
+  "Textbooks",
+  "Study Materials",
+  "Electronics",
+  "Furniture",
+  "Clothing",
+  "Sports Equipment",
+  "Musical Instruments",
+  "Lab Equipment",
+  "Stationery",
+  "Other",
+]
+
+const CONDITIONS = ["New", "Like New", "Good", "Fair", "Poor"]
+
+const PRICE_RANGES = [
+  { label: "Under ₹500", min: 0, max: 500 },
+  { label: "₹500 - ₹1000", min: 500, max: 1000 },
+  { label: "₹1000 - ₹2000", min: 1000, max: 2000 },
+  { label: "₹2000 - ₹5000", min: 2000, max: 5000 },
+  { label: "Over ₹5000", min: 5000, max: Infinity },
+]
 
 export default function FilterSidebar({ onFilterChange, onClose }) {
   const [selectedCategories, setSelectedCategories] = useState([])
-  const [priceRange, setPriceRange] = useState(100)
-  const [sortBy, setSortBy] = useState("newest")
+  const [selectedConditions, setSelectedConditions] = useState([])
+  const [selectedPriceRange, setSelectedPriceRange] = useState(null)
+  const [searchQuery, setSearchQuery] = useState("")
 
   const handleCategoryChange = (category) => {
-    setSelectedCategories((prev) => {
-      if (prev.includes(category)) {
-        return prev.filter((c) => c !== category)
-      } else {
-        return [...prev, category]
-      }
-    })
+    setSelectedCategories((prev) =>
+      prev.includes(category)
+        ? prev.filter((c) => c !== category)
+        : [...prev, category]
+    )
+  }
+
+  const handleConditionChange = (condition) => {
+    setSelectedConditions((prev) =>
+      prev.includes(condition)
+        ? prev.filter((c) => c !== condition)
+        : [...prev, condition]
+    )
+  }
+
+  const handlePriceRangeChange = (range) => {
+    setSelectedPriceRange(range === selectedPriceRange ? null : range)
+  }
+
+  const handleSearchChange = (e) => {
+    setSearchQuery(e.target.value)
   }
 
   const applyFilters = () => {
     onFilterChange({
       categories: selectedCategories,
-      priceRange,
-      sortBy,
+      conditions: selectedConditions,
+      priceRange: selectedPriceRange,
+      searchQuery,
     })
+  }
 
-    if (onClose) {
-      onClose()
-    }
+  const clearFilters = () => {
+    setSelectedCategories([])
+    setSelectedConditions([])
+    setSelectedPriceRange(null)
+    setSearchQuery("")
+    onFilterChange({
+      categories: [],
+      conditions: [],
+      priceRange: null,
+      searchQuery: "",
+    })
   }
 
   return (
-    <div className="neo-brutalism bg-white p-6">
-      {onClose && (
-        <div className="mb-4 flex justify-end">
-          <button onClick={onClose} className="rounded-full border-2 border-black p-1">
+    <div className="w-full rounded-lg bg-white p-6 shadow-md">
+      <div className="mb-6 flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-gray-900">Filters</h3>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-500"
+          >
             <X className="h-5 w-5" />
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
-      <h2 className="mb-6 text-2xl font-black">FILTERS</h2>
+      {/* Search */}
+      <div className="mb-6">
+        <label className="mb-2 block text-sm font-medium text-gray-700">
+          Search
+        </label>
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={handleSearchChange}
+          placeholder="Search items..."
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        />
+      </div>
 
       {/* Categories */}
       <div className="mb-6">
-        <h3 className="mb-3 text-lg font-bold">Categories</h3>
+        <label className="mb-2 block text-sm font-medium text-gray-700">
+          Categories
+        </label>
         <div className="space-y-2">
           {CATEGORIES.map((category) => (
-            <label key={category} className="flex cursor-pointer items-center gap-2">
-              <div
-                className={`flex h-6 w-6 items-center justify-center border-3 border-black ${
-                  selectedCategories.includes(category) ? "bg-neo-blue" : "bg-white"
-                }`}
-                onClick={() => handleCategoryChange(category)}
-              >
-                {selectedCategories.includes(category) && <Check className="h-4 w-4 text-white" />}
-              </div>
-              <span className="font-medium">{category}</span>
+            <label key={category} className="flex items-center">
+              <input
+                type="checkbox"
+                checked={selectedCategories.includes(category)}
+                onChange={() => handleCategoryChange(category)}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="ml-2 text-sm text-gray-700">{category}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Condition */}
+      <div className="mb-6">
+        <label className="mb-2 block text-sm font-medium text-gray-700">
+          Condition
+        </label>
+        <div className="space-y-2">
+          {CONDITIONS.map((condition) => (
+            <label key={condition} className="flex items-center">
+              <input
+                type="checkbox"
+                checked={selectedConditions.includes(condition)}
+                onChange={() => handleConditionChange(condition)}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="ml-2 text-sm text-gray-700">{condition}</span>
             </label>
           ))}
         </div>
@@ -66,54 +148,39 @@ export default function FilterSidebar({ onFilterChange, onClose }) {
 
       {/* Price Range */}
       <div className="mb-6">
-        <h3 className="mb-3 text-lg font-bold">Max Price: ${priceRange}</h3>
-        <input
-          type="range"
-          min="0"
-          max="500"
-          value={priceRange}
-          onChange={(e) => setPriceRange(e.target.value)}
-          className="h-3 w-full appearance-none rounded-full bg-gray-200"
-        />
-        <div className="mt-1 flex justify-between text-sm">
-          <span>$0</span>
-          <span>$500</span>
-        </div>
-      </div>
-
-      {/* Sort By */}
-      <div className="mb-6">
-        <h3 className="mb-3 text-lg font-bold">Sort By</h3>
+        <label className="mb-2 block text-sm font-medium text-gray-700">
+          Price Range
+        </label>
         <div className="space-y-2">
-          {["newest", "price-low", "price-high"].map((option) => {
-            const label =
-              option === "newest"
-                ? "Newest First"
-                : option === "price-low"
-                  ? "Price: Low to High"
-                  : "Price: High to Low"
-
-            return (
-              <label key={option} className="flex cursor-pointer items-center gap-2">
-                <div
-                  className={`flex h-6 w-6 items-center justify-center rounded-full border-3 border-black ${
-                    sortBy === option ? "bg-neo-green" : "bg-white"
-                  }`}
-                  onClick={() => setSortBy(option)}
-                >
-                  {sortBy === option && <div className="h-3 w-3 rounded-full bg-black"></div>}
-                </div>
-                <span className="font-medium">{label}</span>
-              </label>
-            )
-          })}
+          {PRICE_RANGES.map((range) => (
+            <label key={range.label} className="flex items-center">
+              <input
+                type="radio"
+                checked={selectedPriceRange === range}
+                onChange={() => handlePriceRangeChange(range)}
+                className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="ml-2 text-sm text-gray-700">{range.label}</span>
+            </label>
+          ))}
         </div>
       </div>
 
-      {/* Apply Button */}
-      <button onClick={applyFilters} className="neo-brutalism-button w-full bg-neo-yellow font-black">
-        APPLY FILTERS
-      </button>
+      {/* Action Buttons */}
+      <div className="flex gap-4">
+        <button
+          onClick={clearFilters}
+          className="flex-1 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Clear All
+        </button>
+        <button
+          onClick={applyFilters}
+          className="flex-1 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          Apply Filters
+        </button>
+      </div>
     </div>
   )
 }

@@ -10,13 +10,30 @@ export default function AuthPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [name, setName] = useState("")
+  const [otp, setOtp] = useState("")
   const [error, setError] = useState("")
+  const [otpSent, setOtpSent] = useState(false)
   const router = useRouter()
-  const { login, signup } = useAuth()
+  const { login, signup, sendOTP, verifyOTP } = useAuth()
 
   const validateEmail = (email) => {
     const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.edu\.in$/
     return regex.test(email)
+  }
+
+  const handleSendOTP = async () => {
+    if (!validateEmail(email)) {
+      setError("Please use your college email address (username@collegename.edu.in)")
+      return
+    }
+
+    try {
+      await sendOTP(email)
+      setOtpSent(true)
+      setError("")
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
   const handleSubmit = async (e) => {
@@ -33,12 +50,26 @@ export default function AuthPage() {
       if (isLogin) {
         success = await login(email, password)
       } else {
-        success = await signup(email, password, name)
+        if (!otpSent) {
+          await handleSendOTP()
+          return
+        }
+        
+        // Verify OTP first
+        try {
+          await verifyOTP(email, otp)
+        } catch (err) {
+          setError("Invalid OTP. Please try again.")
+          return
+        }
+
+        // If OTP is valid, proceed with signup
+        success = await signup(email, password, name, otp)
       }
       
       if (success) {
         router.push('/')
-        router.refresh() // Force a refresh to update the navbar
+        router.refresh()
       }
     } catch (err) {
       setError(err.message)
@@ -55,7 +86,12 @@ export default function AuthPage() {
           <p className="mt-2 text-center text-sm text-gray-600">
             Or{" "}
             <button
-              onClick={() => setIsLogin(!isLogin)}
+              onClick={() => {
+                setIsLogin(!isLogin)
+                setOtpSent(false)
+                setError("")
+                setOtp("")
+              }}
               className="font-medium text-blue-600 hover:text-blue-500"
             >
               {isLogin ? "create a new account" : "sign in to your account"}
@@ -70,66 +106,85 @@ export default function AuthPage() {
             </div>
           )}
 
-          <div className="space-y-4 rounded-md shadow-sm">
-            {!isLogin && (
-              <div>
-                <label htmlFor="name" className="sr-only">
-                  Full Name
-                </label>
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="relative block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
-                  placeholder="Full Name"
-                />
-              </div>
-            )}
-            <div>
-              <label htmlFor="email" className="sr-only">
-                College Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="relative block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
-                placeholder="College Email (username@collegename.edu.in)"
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="relative block w-full rounded-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
-                placeholder="Password"
-              />
-            </div>
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              Email
+            </label>
+            <input
+              type="email"
+              id="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              placeholder="Enter your email"
+              required
+            />
           </div>
 
           <div>
-            <button
-              type="submit"
-              className="group relative flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-            >
-              {isLogin ? "Sign in" : "Sign up"}
-            </button>
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              Password
+            </label>
+            <input
+              type="password"
+              id="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              placeholder="Enter your password"
+              required
+            />
           </div>
+
+          {!isLogin && (
+            <>
+              <div>
+                <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                  Name
+                </label>
+                <input
+                  type="text"
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  placeholder="Enter your name"
+                  required
+                />
+              </div>
+              {otpSent ? (
+                <div>
+                  <label htmlFor="otp" className="block text-sm font-medium text-gray-700">
+                    OTP
+                  </label>
+                  <input
+                    type="text"
+                    id="otp"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    placeholder="Enter the OTP sent to your email"
+                    required
+                  />
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSendOTP}
+                  className="w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-all hover:bg-blue-700"
+                >
+                  Send OTP
+                </button>
+              )}
+            </>
+          )}
+
+          <button
+            type="submit"
+            className="w-full rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-all hover:bg-blue-700"
+          >
+            {isLogin ? "Sign In" : (otpSent ? "Sign Up" : "Send OTP")}
+          </button>
         </form>
       </div>
     </div>

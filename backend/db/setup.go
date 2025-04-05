@@ -21,17 +21,23 @@ func InitDB() error {
 		os.Getenv("DB_NAME"),
 	)
 
+	log.Printf("Attempting to connect to PostgreSQL database at %s:%s...", os.Getenv("DB_HOST"), os.Getenv("DB_PORT"))
+
 	// Connect to PostgreSQL
 	var err error
 	DB, err = sql.Open("postgres", connStr)
 	if err != nil {
+		log.Printf("❌ Failed to open database connection: %v", err)
 		return fmt.Errorf("error connecting to database: %v", err)
 	}
 
 	// Test the connection
 	if err = DB.Ping(); err != nil {
+		log.Printf("❌ Failed to ping database: %v", err)
 		return fmt.Errorf("error pinging database: %v", err)
 	}
+
+	log.Printf("✅ Successfully connected to PostgreSQL database '%s'", os.Getenv("DB_NAME"))
 
 	// Create database if it doesn't exist
 	_, err = DB.Exec(`
@@ -43,9 +49,10 @@ func InitDB() error {
 		);
 	`)
 	if err != nil {
+		log.Printf("❌ Failed to create otp_verifications table: %v", err)
 		return fmt.Errorf("error creating otp_verifications table: %v", err)
 	}
 
-	log.Println("Database initialized successfully")
+	log.Printf("✅ Successfully initialized database tables")
 	return nil
 }

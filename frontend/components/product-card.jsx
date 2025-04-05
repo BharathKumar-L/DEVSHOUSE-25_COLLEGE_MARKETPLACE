@@ -5,41 +5,37 @@ import { Eye } from "lucide-react"
 export default function ProductCard({ product }) {
   const { id, title, price, category, image, seller, postedDate } = product
 
-  // Randomly select a color class for the category badge
-  const colorClasses = ["bg-neo-pink", "bg-neo-blue", "bg-neo-green", "bg-neo-yellow", "bg-neo-purple"]
-
-  const randomColorIndex = Math.floor(Math.random() * colorClasses.length)
-  const badgeColorClass = colorClasses[randomColorIndex]
-
   return (
-    <div className="neo-brutalism group overflow-hidden bg-white transition-all hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-none">
+    <div className="group overflow-hidden rounded-xl bg-white shadow-md transition-all hover:shadow-lg">
       <div className="relative h-48 w-full overflow-hidden">
         <Image
           src={image || "/placeholder.svg"}
           alt={title}
           fill
-          className="object-cover transition-transform group-hover:scale-105"
+          className="object-cover transition-transform duration-300 group-hover:scale-105"
         />
-        <div className={`absolute right-2 top-2 ${badgeColorClass} border-2 border-black px-2 py-1 font-bold`}>
+        <div className="absolute right-2 top-2 rounded-lg bg-blue-600 px-3 py-1 text-sm font-semibold text-white">
           {category}
         </div>
       </div>
 
-      <div className="p-4">
-        <h3 className="mb-1 text-xl font-bold">{title}</h3>
-        <p className="mb-3 text-2xl font-black">${price}</p>
+      <div className="p-6">
+        <h3 className="mb-2 text-lg font-semibold text-gray-900 line-clamp-2">{title}</h3>
+        <p className="mb-4 text-2xl font-bold text-blue-600">${price}</p>
 
-        <div className="mb-4 flex items-center justify-between text-sm">
-          <span>Seller: {seller}</span>
+        <div className="mb-6 flex items-center justify-between text-sm text-gray-500">
+          <span className="flex items-center gap-1">
+            <span className="font-medium">By</span> {seller}
+          </span>
           <span>{postedDate}</span>
         </div>
 
         <Link
           href={`/product/${id}`}
-          className="neo-brutalism-button flex w-full items-center justify-center gap-2 bg-neo-yellow"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition-all hover:bg-blue-700"
         >
           <Eye className="h-5 w-5" />
-          <span>View Details</span>
+          <span className="font-medium">View Details</span>
         </Link>
       </div>
     </div>
