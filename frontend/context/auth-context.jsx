@@ -30,72 +30,30 @@ export function AuthProvider({ children }) {
     return college.charAt(0).toUpperCase() + college.slice(1)
   }
 
-  const sendOTP = async (email) => {
+  const updateUser = (newUserData) => {
+    setUser(newUserData)
+    localStorage.setItem('user', JSON.stringify(newUserData))
+    Cookies.set('user', JSON.stringify(newUserData), { expires: 7 })
+  }
+
+  const updateProfile = async (profileData) => {
     try {
-      const response = await fetch('http://localhost:8080/api/send-otp', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      })
-      const data = await response.json()
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to send OTP')
-      }
+      // In a real app, this would make an API call to update the profile
+      const updatedUser = { ...user, ...profileData }
+      updateUser(updatedUser)
       return true
     } catch (error) {
-      throw error
+      throw new Error("Failed to update profile")
     }
   }
 
-  const verifyOTP = async (email, otp) => {
+  const changePassword = async (currentPassword, newPassword) => {
     try {
-      const response = await fetch('http://localhost:8080/api/verify-otp', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, otp }),
-      })
-      const data = await response.json()
-      if (!response.ok) {
-        throw new Error(data.error || 'Invalid OTP')
-      }
+      // In a real app, this would make an API call to change the password
+      // For now, we'll just simulate a successful password change
       return true
     } catch (error) {
-      throw error
-    }
-  }
-
-  const signup = async (email, password, name, otp) => {
-    try {
-      // First verify the OTP
-      await verifyOTP(email, otp)
-
-      // If OTP is valid, proceed with registration
-      const response = await fetch('http://localhost:8080/api/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password, name, otp }),
-      })
-      const data = await response.json()
-      if (!response.ok) {
-        throw new Error(data.error || 'Registration failed')
-      }
-
-      // Registration successful, set user data
-      const college = extractCollegeName(email)
-      const userData = { email, name, yearOfStudy: "1st Year" }
-      setCollegeName(college)
-      setUser(userData)
-      localStorage.setItem('user', JSON.stringify(userData))
-      Cookies.set('user', JSON.stringify(userData), { expires: 7 })
-      return true
-    } catch (error) {
-      throw error
+      throw new Error("Failed to change password")
     }
   }
 
@@ -106,7 +64,18 @@ export function AuthProvider({ children }) {
     setCollegeName(college)
     setUser(userData)
     localStorage.setItem('user', JSON.stringify(userData))
-    Cookies.set('user', JSON.stringify(userData), { expires: 7 })
+    Cookies.set('user', JSON.stringify(userData), { expires: 7 }) // Store for 7 days
+    return true
+  }
+
+  const signup = async (email, password, name) => {
+    // In a real app, this would make an API call to create a new user
+    const college = extractCollegeName(email)
+    const userData = { email, name, yearOfStudy: "1st Year" }
+    setCollegeName(college)
+    setUser(userData)
+    localStorage.setItem('user', JSON.stringify(userData))
+    Cookies.set('user', JSON.stringify(userData), { expires: 7 }) // Store for 7 days
     return true
   }
 
@@ -115,12 +84,6 @@ export function AuthProvider({ children }) {
     setCollegeName("")
     localStorage.removeItem('user')
     Cookies.remove('user')
-  }
-
-  const updateUser = (newUserData) => {
-    setUser(newUserData)
-    localStorage.setItem('user', JSON.stringify(newUserData))
-    Cookies.set('user', JSON.stringify(newUserData), { expires: 7 })
   }
 
   return (
@@ -133,8 +96,8 @@ export function AuthProvider({ children }) {
       signup, 
       logout, 
       updateUser,
-      sendOTP,
-      verifyOTP 
+      updateProfile,
+      changePassword
     }}>
       {children}
     </AuthContext.Provider>

@@ -1,210 +1,318 @@
 "use client"
 
-import { useState } from "react"
-import ProductCard from "@/components/product-card"
-import FilterSidebar from "@/components/filter-sidebar"
-import { Menu } from "lucide-react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useAuth } from "@/context/auth-context"
+import { ShoppingBag, MessageSquare, User, Plus, Filter, Search } from "lucide-react"
+import laptop from "../../backend/uploads/laptop.jpeg"
+import deskchair from "../../backend/uploads/deskchair.jpg"
+import textbook from "../../backend/uploads/textbook.jpg"
 
-// Sample product data
+// Sample data - replace with actual data fetching
 const PRODUCTS = [
   {
     id: 1,
     title: "Engineering Textbook",
-    price: 25,
-    category: "Textbooks",
-    condition: "Like New",
-    image: "/placeholder.svg?height=200&width=200",
-    seller: "John D.",
-    postedDate: "2 days ago",
+    price: 175,
+    category: "textbooks",
+    condition: "like new",
+    image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSJLqyoM5QobqRCw6DkoXWv-cwXhYDKBYGP2w&s",
+    createdAt: "2024-03-15"
   },
   {
     id: 2,
-    title: "Desk Lamp",
-    price: 15,
-    category: "Furniture",
-    condition: "Good",
-    image: "/placeholder.svg?height=200&width=200",
-    seller: "Sarah M.",
-    postedDate: "5 days ago",
+    title: "Laptop",
+    price: 20000,
+    category: "electronics",
+    condition: "good",
+    image: "https://images.jdmagicbox.com/quickquotes/images_main/second-hand-canon-laptop-2222941636-m878bd8c.jpg",
+    createdAt: "2024-03-14"
   },
   {
     id: 3,
-    title: "Scientific Calculator",
-    price: 30,
-    category: "Electronics",
-    condition: "New",
-    image: "/placeholder.svg?height=200&width=200",
-    seller: "Mike T.",
-    postedDate: "1 week ago",
-  },
-  {
-    id: 4,
-    title: "Study Notes",
-    price: 10,
-    category: "Study Materials",
-    condition: "Good",
-    image: "/placeholder.svg?height=200&width=200",
-    seller: "Emma K.",
-    postedDate: "3 days ago",
-  },
-  {
-    id: 5,
-    title: "Lab Coat",
-    price: 20,
-    category: "Lab Equipment",
-    condition: "Fair",
-    image: "/placeholder.svg?height=200&width=200",
-    seller: "Alex P.",
-    postedDate: "Just now",
-  },
-  {
-    id: 6,
     title: "Desk Chair",
-    price: 50,
-    category: "Furniture",
-    condition: "Good",
-    image: "/placeholder.svg?height=200&width=200",
-    seller: "Lisa R.",
-    postedDate: "4 days ago",
-  },
+    price: 1500,
+    category: "furniture",
+    condition: "used",
+    image: "https://5.imimg.com/data5/MF/LH/HO/GLADMIN-87315774/used-office-chair-buyer-service-500x500.jpg",
+    createdAt: "2024-03-13"
+  }
 ]
 
 export default function Home() {
-  const { user, collegeName } = useAuth()
+  const { user } = useAuth()
+  const [searchQuery, setSearchQuery] = useState("")
   const [showFilters, setShowFilters] = useState(false)
+  const [filters, setFilters] = useState({
+    category: "all",
+    priceRange: "all",
+    condition: "all",
+    sortBy: "newest"
+  })
   const [filteredProducts, setFilteredProducts] = useState(PRODUCTS)
 
-  const handleFilterChange = (filters) => {
-    let filtered = [...PRODUCTS]
+  // Update filtered products whenever search query or filters change
+  useEffect(() => {
+    let result = [...PRODUCTS]
 
-    // Apply category filter
-    if (filters.categories.length > 0) {
-      filtered = filtered.filter((product) =>
-        filters.categories.includes(product.category)
+    // Apply search filter
+    if (searchQuery) {
+      result = result.filter(product => 
+        product.title.toLowerCase().includes(searchQuery.toLowerCase())
       )
     }
 
-    // Apply condition filter
-    if (filters.conditions.length > 0) {
-      filtered = filtered.filter((product) =>
-        filters.conditions.includes(product.condition)
-      )
+    // Apply category filter
+    if (filters.category !== "all") {
+      result = result.filter(product => product.category === filters.category)
     }
 
     // Apply price range filter
-    if (filters.priceRange) {
-      filtered = filtered.filter(
-        (product) =>
-          product.price >= filters.priceRange.min &&
-          product.price <= filters.priceRange.max
-      )
+    if (filters.priceRange !== "all") {
+      const [min, max] = filters.priceRange.split("-").map(Number)
+      result = result.filter(product => {
+        if (max) {
+          return product.price >= min && product.price <= max
+        }
+        return product.price >= min
+      })
     }
 
-    // Apply search query filter
-    if (filters.searchQuery) {
-      const query = filters.searchQuery.toLowerCase()
-      filtered = filtered.filter(
-        (product) =>
-          product.title.toLowerCase().includes(query) ||
-          product.category.toLowerCase().includes(query) ||
-          product.seller.toLowerCase().includes(query)
-      )
+    // Apply condition filter
+    if (filters.condition !== "all") {
+      result = result.filter(product => product.condition === filters.condition)
     }
 
-    setFilteredProducts(filtered)
+    // Apply sorting
+    result.sort((a, b) => {
+      switch (filters.sortBy) {
+        case "newest":
+          return new Date(b.createdAt) - new Date(a.createdAt)
+        case "oldest":
+          return new Date(a.createdAt) - new Date(b.createdAt)
+        case "price-low":
+          return a.price - b.price
+        case "price-high":
+          return b.price - a.price
+        default:
+          return 0
+      }
+    })
+
+    setFilteredProducts(result)
+  }, [searchQuery, filters])
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target
+    setFilters(prev => ({ ...prev, [name]: value }))
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white">
-        <div className="container mx-auto px-4 py-16">
-          <div className="flex flex-col items-center justify-between gap-8 md:flex-row">
-            <div className="text-center md:text-left">
-              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-                {collegeName ? `${collegeName} Marketplace` : "College Marketplace"}
-              </h1>
-              <p className="mt-4 text-lg text-blue-100">Connect with your college community to buy and sell items</p>
-            </div>
+      <section className="brutal-section bg-yellow-50">
+        <div className="brutal-container">
+          <div className="brutal-card">
+            <h1 className="brutal-heading-1 text-blue-900">
+              Welcome to College Marketplace
+            </h1>
+            <p className="brutal-text mt-4 text-gray-700">
+              Buy and sell items within your college community. Find great deals on
+              textbooks, electronics, furniture, and more.
+            </p>
             {!user && (
-              <Link 
-                href="/auth" 
-                className="rounded-lg bg-white px-8 py-3 text-lg font-semibold text-blue-600 shadow-lg transition-all hover:bg-blue-50 hover:shadow-xl"
+              <Link
+                href="/auth"
+                className="brutal-button-primary mt-6 inline-block"
               >
                 Get Started
               </Link>
             )}
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Features Section */}
-      {!user && (
-        <div className="container mx-auto px-4 py-12">
-          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="rounded-xl bg-white p-8 shadow-md transition-all hover:shadow-lg">
-              <h3 className="text-xl font-semibold text-gray-900">Buy Items</h3>
-              <p className="mt-2 text-gray-600">Browse through verified listings from your college community</p>
+      <section className="brutal-section">
+        <div className="brutal-container">
+          <div className="brutal-grid">
+            <div className="brutal-card brutal-card-hover bg-yellow-50">
+              <ShoppingBag className="h-12 w-12 text-blue-900" />
+              <h3 className="brutal-heading-3 mt-4 text-blue-900">Buy Items</h3>
+              <p className="brutal-text mt-2 text-gray-700">
+                Browse through thousands of items listed by students in your
+                college.
+              </p>
             </div>
-            <div className="rounded-xl bg-white p-8 shadow-md transition-all hover:shadow-lg">
-              <h3 className="text-xl font-semibold text-gray-900">Sell Items</h3>
-              <p className="mt-2 text-gray-600">List your items and connect with potential buyers</p>
+            <div className="brutal-card brutal-card-hover bg-blue-50">
+              <Plus className="h-12 w-12 text-blue-900" />
+              <h3 className="brutal-heading-3 mt-4 text-blue-900">Sell Items</h3>
+              <p className="brutal-text mt-2 text-gray-700">
+                List your items for sale and reach potential buyers in your
+                college.
+              </p>
             </div>
-            <div className="rounded-xl bg-white p-8 shadow-md transition-all hover:shadow-lg">
-              <h3 className="text-xl font-semibold text-gray-900">Secure Transactions</h3>
-              <p className="mt-2 text-gray-600">Safe and verified transactions within your college network</p>
+            <div className="brutal-card brutal-card-hover bg-red-50">
+              <MessageSquare className="h-12 w-12 text-blue-900" />
+              <h3 className="brutal-heading-3 mt-4 text-blue-900">
+                Secure Transactions
+              </h3>
+              <p className="brutal-text mt-2 text-gray-700">
+                Chat with sellers, negotiate prices, and arrange safe meetups.
+              </p>
             </div>
           </div>
         </div>
-      )}
+      </section>
 
       {/* Products Section */}
-      <div className="container mx-auto px-4 py-12">
-        <div className="mb-8 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-900">Featured Items</h2>
-          <div className="flex items-center gap-4">
-            {!user && (
-              <Link 
-                href="/auth" 
-                className="rounded-lg bg-blue-600 px-6 py-2 text-white shadow-md transition-all hover:bg-blue-700 hover:shadow-lg"
+      <section className="brutal-section">
+        <div className="brutal-container">
+          <div className="flex items-center justify-between">
+            <h2 className="brutal-heading-2 text-blue-900">Featured Items</h2>
+            <div className="flex items-center gap-4">
+              {!user && (
+                <Link
+                  href="/auth"
+                  className="brutal-button-secondary flex items-center gap-2"
+                >
+                  <User className="h-5 w-5" />
+                  <span>Login to Sell</span>
+                </Link>
+              )}
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="brutal-button-secondary flex items-center gap-2"
               >
-                Login to Sell
-              </Link>
-            )}
-            <button 
-              className="rounded-lg bg-gray-200 p-2 text-gray-700 transition-all hover:bg-gray-300 md:hidden" 
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              <Menu className="h-6 w-6" />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-8 md:flex-row">
-          {/* Filter Sidebar - Mobile */}
-          {showFilters && (
-            <div className="md:hidden">
-              <FilterSidebar onFilterChange={handleFilterChange} onClose={() => setShowFilters(false)} />
+                <Filter className="h-5 w-5" />
+                <span>Filters</span>
+              </button>
             </div>
-          )}
-
-          {/* Filter Sidebar - Desktop */}
-          <div className="hidden md:block md:w-1/4">
-            <FilterSidebar onFilterChange={handleFilterChange} />
           </div>
 
-          {/* Product Grid */}
-          <div className="md:w-3/4">
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Search and Filters */}
+          <div className="mt-8 space-y-6">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search items..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="brutal-input pl-10 w-full"
+              />
+              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+            </div>
+
+            {showFilters && (
+              <div className="brutal-card brutal-card-hover bg-blue-50 p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div>
+                    <label className="brutal-text block text-gray-700">
+                      Category
+                    </label>
+                    <select
+                      name="category"
+                      value={filters.category}
+                      onChange={handleFilterChange}
+                      className="brutal-input mt-1 w-full"
+                    >
+                      <option value="all">All Categories</option>
+                      <option value="textbooks">Textbooks</option>
+                      <option value="electronics">Electronics</option>
+                      <option value="furniture">Furniture</option>
+                      <option value="clothing">Clothing</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="brutal-text block text-gray-700">
+                      Price Range
+                    </label>
+                    <select
+                      name="priceRange"
+                      value={filters.priceRange}
+                      onChange={handleFilterChange}
+                      className="brutal-input mt-1 w-full"
+                    >
+                      <option value="all">All Prices</option>
+                      <option value="0-25">Under ₹25</option>
+                      <option value="25-50">₹25 - ₹50</option>
+                      <option value="50-100">₹50 - ₹100</option>
+                      <option value="100-500">₹100 - ₹500</option>
+                      <option value="500-1000">₹500 - ₹1000</option>
+                      <option value="1000-999999">Over ₹1000</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="brutal-text block text-gray-700">
+                      Condition
+                    </label>
+                    <select
+                      name="condition"
+                      value={filters.condition}
+                      onChange={handleFilterChange}
+                      className="brutal-input mt-1 w-full"
+                    >
+                      <option value="all">All Conditions</option>
+                      <option value="new">New</option>
+                      <option value="like new">Like New</option>
+                      <option value="good">Good</option>
+                      <option value="fair">Fair</option>
+                      <option value="poor">Poor</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="brutal-text block text-gray-700">
+                      Sort By
+                    </label>
+                    <select
+                      name="sortBy"
+                      value={filters.sortBy}
+                      onChange={handleFilterChange}
+                      className="brutal-input mt-1 w-full"
+                    >
+                      <option value="newest">Newest First</option>
+                      <option value="oldest">Oldest First</option>
+                      <option value="price-low">Price: Low to High</option>
+                      <option value="price-high">Price: High to Low</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Product Grid */}
+            <div className="brutal-grid mt-8">
               {filteredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
+                <Link
+                  key={product.id}
+                  href={`/product/${product.id}`}
+                  className="brutal-card brutal-card-hover bg-white"
+                >
+                  <img
+                    src={product.image}
+                    alt={product.title}
+                    className="brutal-product-image h-48 w-full"
+                  />
+                  <div className="p-4">
+                    <h3 className="brutal-heading-3 text-blue-900">
+                      {product.title}
+                    </h3>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="brutal-text font-bold text-blue-900">
+                        ₹{product.price}
+                      </span>
+                      <span className="brutal-text-sm text-gray-600">
+                        {product.condition}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
               ))}
             </div>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   )
 }

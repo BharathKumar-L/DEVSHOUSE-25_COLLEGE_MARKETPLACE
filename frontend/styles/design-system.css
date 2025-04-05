@@ -1,0 +1,178 @@
+@layer base {
+  :root {
+    /* Colors */
+    --color-primary: 255 196 0; /* Yellow */
+    --color-secondary: 0 123 255; /* Blue */
+    --color-accent: 255 59 48; /* Red */
+    --color-background: 255 255 255;
+    --color-text: 0 0 0;
+    --color-gray: 100 100 100;
+  }
+
+  .dark {
+    --color-background: 0 0 0;
+    --color-text: 255 255 255;
+  }
+}
+
+@layer components {
+  /* Typography */
+  .brutal-heading-1 {
+    @apply text-[2.25rem] font-bold tracking-tight;
+  }
+
+  .brutal-heading-2 {
+    @apply text-[1.75rem] font-bold tracking-tight;
+  }
+
+  .brutal-heading-3 {
+    @apply text-[1.375rem] font-bold tracking-tight;
+  }
+
+  .brutal-text {
+    @apply text-[1.125rem] font-medium;
+  }
+
+  .brutal-text-small {
+    @apply text-base font-medium;
+  }
+
+  /* Layout */
+  .brutal-container {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .brutal-section {
+    @apply py-12 sm:py-16;
+  }
+
+  /* Cards & Containers */
+  .brutal-card {
+    @apply border-2 border-black bg-white p-6 shadow-[4px_4px_0px_black];
+  }
+
+  .brutal-card-hover {
+    @apply hover:shadow-[2px_2px_0px_black] hover:-translate-x-[2px] hover:-translate-y-[2px] transition-all;
+  }
+
+  /* Buttons */
+  .brutal-button {
+    @apply border-2 border-black bg-white px-6 py-2 font-bold shadow-[4px_4px_0px_black] 
+           hover:shadow-[2px_2px_0px_black] hover:-translate-x-[2px] hover:-translate-y-[2px] 
+           active:shadow-none active:translate-x-[4px] active:translate-y-[4px] transition-all;
+  }
+
+  .brutal-button-primary {
+    @apply brutal-button bg-yellow-400 hover:bg-yellow-500;
+  }
+
+  .brutal-button-secondary {
+    @apply brutal-button bg-blue-400 hover:bg-blue-500;
+  }
+
+  .brutal-button-danger {
+    @apply brutal-button bg-red-400 hover:bg-red-500;
+  }
+
+  /* Forms */
+  .brutal-input {
+    @apply border-2 border-black bg-white px-4 py-2 font-medium shadow-[4px_4px_0px_black]
+           focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2;
+  }
+
+  .brutal-label {
+    @apply text-[1.125rem] font-bold mb-2 block;
+  }
+
+  .brutal-checkbox {
+    @apply h-5 w-5 border-2 border-black rounded-none mr-3;
+  }
+
+  /* Navigation */
+  .brutal-nav-link {
+    @apply text-[1.125rem] font-bold px-4 py-2 border-2 border-black 
+           hover:bg-black hover:text-white transition-colors;
+  }
+
+  .brutal-nav-link-active {
+    @apply bg-black text-white;
+  }
+
+  /* Messages & Alerts */
+  .brutal-alert {
+    @apply border-2 border-black p-4 font-bold;
+  }
+
+  .brutal-alert-success {
+    @apply brutal-alert bg-green-50 text-green-700;
+  }
+
+  .brutal-alert-error {
+    @apply brutal-alert bg-red-50 text-red-700;
+  }
+
+  .brutal-alert-warning {
+    @apply brutal-alert bg-yellow-50 text-yellow-700;
+  }
+
+  /* Product Cards */
+  .brutal-product-card {
+    @apply brutal-card brutal-card-hover;
+  }
+
+  .brutal-product-image {
+    @apply w-full h-48 object-cover border-2 border-black;
+  }
+
+  /* Chat UI */
+  .brutal-chat-container {
+    @apply border-2 border-black bg-white p-4 h-[600px] overflow-y-auto;
+  }
+
+  .brutal-chat-message {
+    @apply border-2 border-black p-4 mb-4 max-w-[80%];
+  }
+
+  .brutal-chat-input {
+    @apply brutal-input w-full;
+  }
+
+  /* Grid & Layout */
+  .brutal-grid {
+    @apply grid gap-6;
+  }
+
+  .brutal-grid-cols-2 {
+    @apply brutal-grid grid-cols-1 sm:grid-cols-2;
+  }
+
+  .brutal-grid-cols-3 {
+    @apply brutal-grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3;
+  }
+
+  .brutal-grid-cols-4 {
+    @apply brutal-grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4;
+  }
+}
+
+/* Custom scrollbar */
+@layer utilities {
+  .scrollbar-brutal {
+    scrollbar-width: thin;
+    scrollbar-color: black white;
+  }
+
+  .scrollbar-brutal::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .scrollbar-brutal::-webkit-scrollbar-track {
+    background: white;
+    border: 2px solid black;
+  }
+
+  .scrollbar-brutal::-webkit-scrollbar-thumb {
+    background-color: black;
+    border: 2px solid black;
+  }
+} 

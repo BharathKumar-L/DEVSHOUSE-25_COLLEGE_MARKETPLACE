@@ -1,133 +1,170 @@
 "use client"
 
 import { useState } from "react"
-import Image from "next/image"
+import { useParams } from "next/navigation"
 import { useAuth } from "@/context/auth-context"
-import { MessageCircle, Heart } from "lucide-react"
+import { MessageSquare, Heart, Share2 } from "lucide-react"
 
-// Sample product data
-const PRODUCT = {
-  id: 1,
-  title: "Engineering Textbook",
-  price: 25,
-  category: "Books",
-  description:
-    "This engineering textbook is in excellent condition. It was used for one semester and has minimal highlighting. Perfect for students taking the course this semester.",
-  condition: "Like New",
-  images: [
-    "/placeholder.svg?height=400&width=400",
-    "/placeholder.svg?height=400&width=400",
-    "/placeholder.svg?height=400&width=400",
-  ],
-  seller: {
-    name: "John D.",
-    avatar: "/placeholder.svg",
-    rating: 4.8,
-    joined: "2023",
-  },
-  postedDate: "2 days ago",
-  location: "Engineering Building",
-}
+export default function ProductPage() {
+  const { id } = useParams()
+  const { user } = useAuth()
+  const [isFavorite, setIsFavorite] = useState(false)
 
-export default function ProductPage({ params }) {
-  const { isAuthenticated } = useAuth()
-  const [activeImage, setActiveImage] = useState(0)
+  // Sample product data - replace with actual data fetching
+  // const product = {
+  //   id: id,
+  //   title: "Sample Product",
+  //   description: "This is a sample product description.",
+  //   price: 99.99,
+  //   condition: "Like New",
+  //   category: "Electronics",
+  //   images: [
+  //     "https://via.placeholder.com/400",
+  //   ],
+  //   seller: {
+  //     name: "John Doe",
+  //     rating: 4.5,
+  //   },
+  // }
+
+  const products = [
+    {
+      id: 1,
+      title: "Engineering Textbook",
+      description: "This is a engineering textbook",
+      price: 175,
+      condition: "like new",
+      category: "textbooks",
+      image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSJLqyoM5QobqRCw6DkoXWv-cwXhYDKBYGP2w&s",
+      seller: {
+            name: "John Doe",
+            rating: 4.5,
+        },
+    },
+    {
+      id: 2,
+      title: "Laptop",
+      description: "This is a laptop",
+      price: 20000,
+      condition: "good",
+      category: "electronics",
+      image: "https://images.jdmagicbox.com/quickquotes/images_main/second-hand-canon-laptop-2222941636-m878bd8c.jpg",
+      seller: {
+        name: "John David",
+        rating: 4.2,
+      },
+    },
+    {
+      id: 3,
+      title: "Desk Chair",
+      description: "This is a desk chair",
+      price: 1500,
+      category: "furniture",
+      condition: "used",
+      image: "https://5.imimg.com/data5/MF/LH/HO/GLADMIN-87315774/used-office-chair-buyer-service-500x500.jpg",
+      seller: {
+        name: "Tim Jones",
+        rating: 4.7,
+      },
+    }
+  ]
+  
+  // Find the product with the matching ID
+  const product = products.find(p => p.id === parseInt(id)) || products[0]
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="container mx-auto px-4">
-        <div className="mx-auto max-w-6xl">
-          <div className="grid gap-8 md:grid-cols-2">
-            {/* Image Gallery */}
-            <div className="space-y-4">
-              <div className="relative aspect-square overflow-hidden rounded-xl bg-white">
-                <Image
-                  src={PRODUCT.images[activeImage]}
-                  alt={PRODUCT.title}
-                  fill
-                  className="object-cover"
-                />
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                {PRODUCT.images.map((image, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setActiveImage(index)}
-                    className={`relative aspect-square overflow-hidden rounded-lg bg-white ${
-                      activeImage === index ? "ring-2 ring-blue-500" : ""
+    <div className="min-h-screen mt-16 bg-white">
+      <section className="brutal-section">
+        <div className="brutal-container">
+          <div className="brutal-grid">
+            {/* Product Images */}
+            <div className="brutal-card brutal-card-hover bg-yellow-50">
+              <img
+                src={product.image}
+                alt={product.title}
+                className="brutal-product-image w-full"
+              />
+            </div>
+
+            {/* Product Details */}
+            <div className="brutal-card brutal-card-hover bg-blue-50">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h1 className="brutal-heading-2 text-blue-900">
+                    {product.title}
+                  </h1>
+                  <p className="brutal-text mt-2 text-gray-700">
+                    {product.description}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsFavorite(!isFavorite)}
+                  className="brutal-button-secondary p-2"
+                >
+                  <Heart
+                    className={`h-6 w-6 ${
+                      isFavorite ? "fill-red-500 text-red-500" : ""
                     }`}
-                  >
-                    <Image src={image} alt={`${PRODUCT.title} ${index + 1}`} fill className="object-cover" />
-                  </button>
-                ))}
+                  />
+                </button>
+              </div>
+
+              <div className="mt-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="brutal-text text-gray-700">Price</span>
+                  <span className="brutal-text font-bold text-blue-900">
+                    ₹{product.price}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="brutal-text text-gray-700">Condition</span>
+                  <span className="brutal-text font-bold text-blue-900">
+                    {product.condition}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="brutal-text text-gray-700">Category</span>
+                  <span className="brutal-text font-bold text-blue-900">
+                    {product.category}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-8 space-y-4">
+                <button className="brutal-button-primary w-full">
+                  Contact Seller
+                </button>
+                <button className="brutal-button-secondary flex w-full items-center justify-center gap-2">
+                  <Share2 className="h-5 w-5" />
+                  <span>Share</span>
+                </button>
               </div>
             </div>
 
-            {/* Product Info */}
-            <div className="space-y-6">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">{PRODUCT.title}</h1>
-                <p className="mt-2 text-2xl font-bold text-blue-600">${PRODUCT.price}</p>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <div className="h-10 w-10 rounded-full bg-gray-200">
-                    <Image
-                      src={PRODUCT.seller.avatar}
-                      alt={PRODUCT.seller.name}
-                      width={40}
-                      height={40}
-                      className="rounded-full"
-                    />
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900">{PRODUCT.seller.name}</p>
-                    <p className="text-sm text-gray-500">Joined {PRODUCT.seller.joined}</p>
-                  </div>
+            {/* Seller Info */}
+            <div className="brutal-card brutal-card-hover bg-red-50">
+              <h2 className="brutal-heading-3 text-blue-900">Seller Information</h2>
+              <div className="mt-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="brutal-text text-gray-700">Name</span>
+                  <span className="brutal-text font-bold text-blue-900">
+                    {product.seller.name}
+                  </span>
                 </div>
-                <div className="rounded-lg bg-blue-50 px-3 py-1">
-                  <p className="text-sm font-medium text-blue-600">{PRODUCT.seller.rating} ★</p>
+                <div className="flex items-center justify-between">
+                  <span className="brutal-text text-gray-700">Rating</span>
+                  <span className="brutal-text font-bold text-blue-900">
+                    {product.seller.rating}/5.0
+                  </span>
                 </div>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-medium text-gray-900">Description</h3>
-                  <p className="mt-2 text-gray-600">{PRODUCT.description}</p>
-                </div>
-
-                <div>
-                  <h3 className="font-medium text-gray-900">Condition</h3>
-                  <p className="mt-2 text-gray-600">{PRODUCT.condition}</p>
-                </div>
-
-                <div>
-                  <h3 className="font-medium text-gray-900">Location</h3>
-                  <p className="mt-2 text-gray-600">{PRODUCT.location}</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                {isAuthenticated ? (
-                  <>
-                    <button className="flex-1 rounded-lg bg-blue-600 px-4 py-3 text-center font-medium text-white hover:bg-blue-700">
-                      Message Seller
-                    </button>
-                    <button className="rounded-lg border border-gray-300 px-4 py-3 text-gray-700 hover:bg-gray-50">
-                      <Heart className="h-5 w-5" />
-                    </button>
-                  </>
-                ) : (
-                  <button className="flex-1 rounded-lg bg-blue-600 px-4 py-3 text-center font-medium text-white hover:bg-blue-700">
-                    Login to Message
-                  </button>
-                )}
+                <button className="brutal-button-secondary mt-6 w-full">
+                  View Seller Profile
+                </button>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   )
 }

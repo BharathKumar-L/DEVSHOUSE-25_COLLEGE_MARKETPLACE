@@ -2,212 +2,202 @@
 
 import { useState } from "react"
 import { useAuth } from "@/context/auth-context"
-import { User, Mail, Building2, Settings, Edit2, X, GraduationCap } from "lucide-react"
-import Link from "next/link"
+import { User, Mail, Phone, MapPin, Edit2, Camera, GraduationCap } from "lucide-react"
 
 export default function ProfilePage() {
-  const { user, collegeName, updateUser } = useAuth()
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-  const [newName, setNewName] = useState(user?.name || "")
-  const [newYearOfStudy, setNewYearOfStudy] = useState(user?.yearOfStudy || "1st Year")
+  const { user, updateProfile } = useAuth()
+  const [isEditing, setIsEditing] = useState(false)
+  const [formData, setFormData] = useState({
+    name: user?.name || "",
+    yearOfStudy: user?.yearOfStudy || "",
+    phone: user?.phone || "",
+    location: user?.location || "",
+  })
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
 
-  const handleNameUpdate = () => {
-    if (newName.trim()) {
-      updateUser({ ...user, name: newName.trim(), yearOfStudy: newYearOfStudy })
-      setIsEditModalOpen(false)
+  const handleInputChange = (e) => {
+    const { name, value } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }))
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setError("")
+    setSuccess("")
+
+    try {
+      await updateProfile(formData)
+      setSuccess("Profile updated successfully")
+      setIsEditing(false)
+    } catch (err) {
+      setError(err.message)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
-      <div className="container mx-auto px-4">
-        <div className="mx-auto max-w-3xl">
-          {/* Profile Header */}
-          <div className="rounded-lg bg-white p-6 shadow-sm">
+    <div className="min-h-screen bg-white">
+      <section className="brutal-section">
+        <div className="brutal-container">
+          <div className="brutal-card brutal-card-hover bg-yellow-50">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-blue-100">
-                  <User className="h-10 w-10 text-blue-600" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">{user?.name || "User"}</h1>
-                  <p className="text-gray-600">{collegeName} Student</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setIsEditModalOpen(true)}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+              <h1 className="brutal-heading-2 text-blue-900">Profile</h1>
+              <button
+                onClick={() => setIsEditing(!isEditing)}
+                className="brutal-button-secondary flex items-center gap-2"
               >
                 <Edit2 className="h-5 w-5" />
+                <span>{isEditing ? "Cancel" : "Edit Profile"}</span>
               </button>
             </div>
-          </div>
 
-          {/* Edit Name Modal */}
-          {isEditModalOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-              <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-medium text-gray-900">Edit Profile</h3>
-                  <button
-                    onClick={() => setIsEditModalOpen(false)}
-                    className="text-gray-400 hover:text-gray-500"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
-                <div className="mt-4 space-y-4">
-                  <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                      Name
-                    </label>
-                    <input
-                      type="text"
-                      id="name"
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      placeholder="Enter your name"
-                    />
+            {/* Error and Success Messages */}
+            {error && (
+              <div className="mt-4 p-4 bg-red-50 border-2 border-red-600 text-red-900">
+                {error}
+              </div>
+            )}
+            {success && (
+              <div className="mt-4 p-4 bg-green-50 border-2 border-green-600 text-green-900">
+                {success}
+              </div>
+            )}
+
+            <div className="mt-8">
+              <div className="brutal-card brutal-card-hover bg-blue-50 p-6">
+                <div className="flex flex-col items-center">
+                  <div className="relative">
+                    <div className="h-32 w-32 rounded-full bg-gray-200">
+                      {user?.photoURL ? (
+                        <img
+                          src={user.photoURL}
+                          alt="Profile"
+                          className="h-full w-full rounded-full object-cover"
+                        />
+                      ) : (
+                        <User className="h-full w-full p-8 text-gray-400" />
+                      )}
+                    </div>
+                    {isEditing && (
+                      <button className="absolute bottom-0 right-0 rounded-full bg-blue-600 p-2 text-white">
+                        <Camera className="h-5 w-5" />
+                      </button>
+                    )}
                   </div>
-                  <div>
-                    <label htmlFor="yearOfStudy" className="block text-sm font-medium text-gray-700">
-                      Year of Study
-                    </label>
-                    <select
-                      id="yearOfStudy"
-                      value={newYearOfStudy}
-                      onChange={(e) => setNewYearOfStudy(e.target.value)}
-                      className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  {isEditing ? (
+                    <div className="mt-4 w-full">
+                      <label className="brutal-text block text-gray-700">
+                        Full Name
+                      </label>
+                      <input
+                        type="text"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleInputChange}
+                        className="brutal-input mt-1 w-full"
+                      />
+                    </div>
+                  ) : (
+                    <h2 className="brutal-heading-3 mt-4 text-blue-900">
+                      {user?.name || "User"}
+                    </h2>
+                  )}
+                  <p className="brutal-text text-gray-600">{user?.email}</p>
+                </div>
+
+                <div className="mt-8 space-y-4">
+                  <div className="flex items-center gap-4">
+                    <GraduationCap className="h-5 w-5 text-blue-900" />
+                    <div className="flex-1">
+                      <label className="brutal-text block text-gray-700">
+                        Year of Study
+                      </label>
+                      {isEditing ? (
+                        <select
+                          name="yearOfStudy"
+                          value={formData.yearOfStudy}
+                          onChange={handleInputChange}
+                          className="brutal-input mt-1 w-full"
+                        >
+                          <option value="">Select Year</option>
+                          <option value="1">First Year</option>
+                          <option value="2">Second Year</option>
+                          <option value="3">Third Year</option>
+                          <option value="4">Fourth Year</option>
+                          <option value="5">Fifth Year</option>
+                          <option value="graduate">Graduate</option>
+                        </select>
+                      ) : (
+                        <p className="brutal-text mt-1 text-gray-900">
+                          {user?.yearOfStudy || "Not specified"}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    <Phone className="h-5 w-5 text-blue-900" />
+                    <div className="flex-1">
+                      <label className="brutal-text block text-gray-700">
+                        Phone
+                      </label>
+                      {isEditing ? (
+                        <input
+                          type="tel"
+                          name="phone"
+                          value={formData.phone}
+                          onChange={handleInputChange}
+                          className="brutal-input mt-1 w-full"
+                        />
+                      ) : (
+                        <p className="brutal-text mt-1 text-gray-900">
+                          {user?.phone || "Not provided"}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    <MapPin className="h-5 w-5 text-blue-900" />
+                    <div className="flex-1">
+                      <label className="brutal-text block text-gray-700">
+                        Location
+                      </label>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          name="location"
+                          value={formData.location}
+                          onChange={handleInputChange}
+                          className="brutal-input mt-1 w-full"
+                        />
+                      ) : (
+                        <p className="brutal-text mt-1 text-gray-900">
+                          {user?.location || "Not provided"}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {isEditing && (
+                  <div className="mt-8">
+                    <button 
+                      onClick={handleSubmit}
+                      className="brutal-button-primary w-full"
                     >
-                      <option value="1st Year">1st Year</option>
-                      <option value="2nd Year">2nd Year</option>
-                      <option value="3rd Year">3rd Year</option>
-                      <option value="4th Year">4th Year</option>
-                      <option value="5th Year">5th Year</option>
-                    </select>
+                      Save Changes
+                    </button>
                   </div>
-                </div>
-                <div className="mt-6 flex justify-end gap-3">
-                  <button
-                    onClick={() => setIsEditModalOpen(false)}
-                    className="rounded-lg bg-gray-100 px-4 py-2 text-gray-700 hover:bg-gray-200"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleNameUpdate}
-                    className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-                  >
-                    Save Changes
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Profile Information */}
-          <div className="mt-6 rounded-lg bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-xl font-semibold text-gray-900">Profile Information</h2>
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Mail className="h-5 w-5 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">Email</p>
-                  <p className="text-gray-900">{user?.email}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <Building2 className="h-5 w-5 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">College</p>
-                  <p className="text-gray-900">{collegeName}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <GraduationCap className="h-5 w-5 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">Year of Study</p>
-                  <p className="text-gray-900">{user?.yearOfStudy || "1st Year"}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Account Settings */}
-          <div className="mt-6 rounded-lg bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-xl font-semibold text-gray-900">Account Settings</h2>
-            <div className="space-y-4">
-              <Link
-                href="/settings"
-                className="flex items-center justify-between rounded-lg p-4 hover:bg-gray-50"
-              >
-                <div className="flex items-center gap-3">
-                  <Settings className="h-5 w-5 text-gray-400" />
-                  <span className="text-gray-900">Account Settings</span>
-                </div>
-                <svg
-                  className="h-5 w-5 text-gray-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </Link>
-              <Link
-                href="/privacy"
-                className="flex items-center justify-between rounded-lg p-4 hover:bg-gray-50"
-              >
-                <div className="flex items-center gap-3">
-                  <svg
-                    className="h-5 w-5 text-gray-400"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                    />
-                  </svg>
-                  <span className="text-gray-900">Privacy Settings</span>
-                </div>
-                <svg
-                  className="h-5 w-5 text-gray-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
-              </Link>
-            </div>
-          </div>
-
-          {/* Activity Section */}
-          <div className="mt-6 rounded-lg bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-xl font-semibold text-gray-900">Recent Activity</h2>
-            <div className="space-y-4">
-              <div className="rounded-lg border border-gray-200 p-4">
-                <p className="text-gray-600">No recent activity</p>
+                )}
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   )
 } 
