@@ -82,6 +82,11 @@ func init() {
 	// Auto migrate the schema
 	db.AutoMigrate(&models.User{}, &models.Product{}, &models.Transaction{})
 
+	// Update products table to add college column with default value
+	db.Exec("ALTER TABLE products ADD COLUMN college text DEFAULT 'default'")
+	db.Exec("UPDATE products SET college = 'default' WHERE college IS NULL")
+	db.Exec("ALTER TABLE products ALTER COLUMN college SET NOT NULL")
+
 	// Seed the database with sample data
 	seedDatabase()
 
