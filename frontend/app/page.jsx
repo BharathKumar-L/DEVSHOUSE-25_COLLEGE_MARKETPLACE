@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useAuth } from "@/context/auth-context"
-import { ShoppingBag, MessageSquare, User, Plus, Filter, Search } from "lucide-react"
+import { ShoppingBag, MessageSquare, User, Plus, Funnel, Search } from "lucide-react"
 import { api } from "@/lib/api"
 
 export default function Home() {
@@ -208,7 +208,7 @@ export default function Home() {
                 onClick={() => setShowFilters(!showFilters)}
                 className="brutal-button-secondary"
               >
-                <Filter className="h-4 w-4 mr-2" />
+                <Funnel className="h-4 w-4 mr-2" />
                 Filters
               </button>
               <div className="relative">
