@@ -7,7 +7,7 @@ import { Mail, Lock, User, Key } from "lucide-react"
 
 export default function AuthPage() {
   const router = useRouter()
-  const { login } = useAuth()
+  const { login, signup } = useAuth()
   const [isLogin, setIsLogin] = useState(true)
   const [showOTP, setShowOTP] = useState(false)
   const [formData, setFormData] = useState({
@@ -15,111 +15,31 @@ export default function AuthPage() {
     password: "",
     name: "",
     otp: "",
+    college: "",
   })
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+  const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setError("")
-    setSuccess("")
+    setLoading(true)
+    setError(null)
 
     try {
       if (isLogin) {
-        // First check if user exists
-        const checkResponse = await fetch("http://localhost:8080/check-email", {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-          },
-          credentials: "include",
-          body: JSON.stringify({
-            email: formData.email,
-          }),
-        })
-        
-        // Log the raw response for debugging
-        const responseText = await checkResponse.text()
-        console.log('Raw response:', responseText)
-        
-        let checkData
-        try {
-          checkData = JSON.parse(responseText)
-          console.log('Parsed response:', checkData)
-        } catch (parseError) {
-          console.error('JSON Parse Error:', parseError)
-          console.error('Response text:', responseText)
-          throw new Error('Invalid response from server')
-        }
-        
-        if (checkResponse.status === 404) {
-          setError("Email not found. Please sign up first.")
-          setIsLogin(false)
-          return
-        }
-        
-        if (!checkResponse.ok) {
-          throw new Error(checkData.error || "Login failed")
-        }
-
-        // If user exists, proceed with login
         await login(formData.email, formData.password)
-        router.push("/")
+        router.push('/')
       } else {
-        if (!showOTP) {
-          // First step: Send signup request
-          const response = await fetch("http://localhost:8080/signup", {
-            method: "POST",
-            headers: { 
-              "Content-Type": "application/json",
-              "Accept": "application/json",
-            },
-            credentials: "include",
-            body: JSON.stringify({
-              email: formData.email,
-              password: formData.password,
-              name: formData.name,
-            }),
-          })
-          
-          const data = await response.json()
-          
-          if (!response.ok) {
-            throw new Error(data.error || "Signup failed")
-          }
-          
-          setSuccess("OTP sent to your email. Please check your inbox.")
+        const data = await signup(formData.email, formData.password, formData.name, formData.college)
+        if (data) {
           setShowOTP(true)
-        } else {
-          // Second step: Verify OTP
-          const response = await fetch("http://localhost:8080/verify-otp", {
-            method: "POST",
-            headers: { 
-              "Content-Type": "application/json",
-              "Accept": "application/json",
-            },
-            credentials: "include",
-            body: JSON.stringify({
-              email: formData.email,
-              otp: formData.otp,
-            }),
-          })
-          
-          const data = await response.json()
-          
-          if (!response.ok) {
-            throw new Error(data.error || "OTP verification failed")
-          }
-          
-          setSuccess("Email verified successfully! Logging you in...")
-          // After successful verification, log the user in
-          await login(formData.email, formData.password)
-          router.push("/")
         }
       }
     } catch (err) {
       setError(err.message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -153,26 +73,50 @@ export default function AuthPage() {
 
             <form onSubmit={handleSubmit} className="mt-8 space-y-6">
               {!isLogin && !showOTP && (
-                <div className="brutal-card brutal-card-hover bg-blue-50 p-6">
-                  <label htmlFor="name" className="brutal-text block text-gray-700">
-                    Full Name
-                  </label>
-                  <div className="mt-1 flex">
-                    <span className="brutal-input inline-flex items-center rounded-l-md border-r-0 px-3">
-                      <User className="h-5 w-5 text-gray-400" />
-                    </span>
-                    <input
-                      type="text"
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value })
-                      }
-                      className="brutal-input w-full rounded-l-none"
-                      required={!isLogin && !showOTP}
-                    />
+                <>
+                  <div className="brutal-card brutal-card-hover bg-blue-50 p-6">
+                    <label htmlFor="name" className="brutal-text block text-gray-700">
+                      Full Name
+                    </label>
+                    <div className="mt-1 flex">
+                      <span className="brutal-input inline-flex items-center rounded-l-md border-r-0 px-3">
+                        <User className="h-5 w-5 text-gray-400" />
+                      </span>
+                      <input
+                        type="text"
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) =>
+                          setFormData({ ...formData, name: e.target.value })
+                        }
+                        className="brutal-input w-full rounded-l-none"
+                        required={!isLogin && !showOTP}
+                      />
+                    </div>
                   </div>
-                </div>
+
+                  <div className="brutal-card brutal-card-hover bg-purple-50 p-6">
+                    <label htmlFor="college" className="brutal-text block text-gray-700">
+                      College Name
+                    </label>
+                    <div className="mt-1 flex">
+                      <span className="brutal-input inline-flex items-center rounded-l-md border-r-0 px-3">
+                        <User className="h-5 w-5 text-gray-400" />
+                      </span>
+                      <input
+                        type="text"
+                        id="college"
+                        value={formData.college}
+                        onChange={(e) =>
+                          setFormData({ ...formData, college: e.target.value })
+                        }
+                        className="brutal-input w-full rounded-l-none"
+                        required={!isLogin && !showOTP}
+                        placeholder="Enter your college name"
+                      />
+                    </div>
+                  </div>
+                </>
               )}
 
               {!showOTP && (
@@ -258,7 +202,7 @@ export default function AuthPage() {
                 onClick={() => {
                   setIsLogin(!isLogin)
                   setShowOTP(false)
-                  setFormData({ email: "", password: "", name: "", otp: "" })
+                  setFormData({ email: "", password: "", name: "", otp: "", college: "" })
                   setError("")
                   setSuccess("")
                 }}

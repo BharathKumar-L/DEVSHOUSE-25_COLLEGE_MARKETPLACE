@@ -11,6 +11,7 @@ type User struct {
 	Email      string `gorm:"unique;not null"`
 	Password   string `gorm:"not null"`
 	Name       string `gorm:"not null"`
+	College    string
 	OTP        string `gorm:"size:6"`
 	OTPExpiry  time.Time
 	IsVerified bool      `gorm:"default:false"`

@@ -6,7 +6,8 @@ export function middleware(request) {
   const isProtectedRoute = pathname.startsWith('/dashboard') || 
                           pathname.startsWith('/sell') || 
                           pathname.startsWith('/chat') ||
-                          pathname.startsWith('/profile')
+                          pathname.startsWith('/profile') ||
+                          pathname.startsWith('/transactions')
 
   // Get the user data from cookies
   const userData = request.cookies.get('user')?.value
@@ -30,6 +31,7 @@ export const config = {
     '/dashboard/:path*',
     '/sell/:path*',
     '/chat/:path*',
-    '/profile/:path*'
+    '/profile/:path*',
+    '/transactions/:path*'
   ]
 } 

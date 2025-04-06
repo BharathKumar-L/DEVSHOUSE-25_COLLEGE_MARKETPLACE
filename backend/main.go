@@ -26,6 +26,7 @@ type SignupRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=6"`
 	Name     string `json:"name" binding:"required"`
+	College  string `json:"college" binding:"required"`
 }
 
 type VerifyOTPRequest struct {
@@ -46,6 +47,12 @@ type CreateProductRequest struct {
 	ImageURL    string  `json:"imageUrl"`
 	Location    string  `json:"location"`
 	ContactInfo string  `json:"contactInfo"`
+	College     string  `json:"college" binding:"required"`
+}
+
+type LoginRequest struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required"`
 }
 
 var db *gorm.DB
@@ -73,7 +80,10 @@ func init() {
 	}
 
 	// Auto migrate the schema
-	db.AutoMigrate(&models.User{}, &models.Product{})
+	db.AutoMigrate(&models.User{}, &models.Product{}, &models.Transaction{})
+
+	// Seed the database with sample data
+	seedDatabase()
 
 	// Initialize email dialer
 	mailer = gomail.NewDialer(
@@ -126,9 +136,30 @@ func sendOTPEmail(email, otp string) error {
 func signup(c *gin.Context) {
 	var req SignupRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("Error binding JSON: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	log.Printf("Received signup request: %+v", req)
+
+	// Extract college name from email domain
+	// Format: username@college.edu.in
+	emailParts := strings.Split(req.Email, "@")
+	if len(emailParts) != 2 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid email format"})
+		return
+	}
+
+	domainParts := strings.Split(emailParts[1], ".")
+	if len(domainParts) < 3 || domainParts[1] != "edu" || domainParts[2] != "in" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Email must be in the format username@collegename.edu.in"})
+		return
+	}
+
+	// Handle college names with multiple words (e.g., "indian-institute" -> "Indian Institute")
+	collegeName := strings.Title(strings.ReplaceAll(domainParts[0], "-", " "))
+	log.Printf("Extracted college name from email: %s", collegeName)
 
 	// Check if user already exists
 	var existingUser models.User
@@ -148,17 +179,21 @@ func signup(c *gin.Context) {
 		return
 	}
 
-	// Create user
+	// Create user with the college name from email domain
 	user := models.User{
 		Email:      req.Email,
 		Password:   string(hashedPassword),
 		Name:       req.Name,
+		College:    collegeName, // Use the extracted college name
 		OTP:        otp,
 		OTPExpiry:  otpExpiry,
 		IsVerified: false,
 	}
 
+	log.Printf("Creating user with data: %+v", user)
+
 	if err := db.Create(&user).Error; err != nil {
+		log.Printf("Error creating user: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error creating user"})
 		return
 	}
@@ -241,8 +276,18 @@ func createProduct(c *gin.Context) {
 		return
 	}
 
-	// Get user ID from session/token (you'll need to implement this)
-	userID := uint(1) // Temporary hardcoded user ID for testing
+	// Get user from session
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	// Validate required fields
+	if req.Title == "" || req.Description == "" || req.Price <= 0 || req.Category == "" || req.Condition == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "All fields are required"})
+		return
+	}
 
 	product := models.Product{
 		Title:       req.Title,
@@ -251,9 +296,11 @@ func createProduct(c *gin.Context) {
 		Category:    req.Category,
 		Condition:   req.Condition,
 		ImageURL:    req.ImageURL,
-		UserID:      userID,
+		UserID:      userID.(uint),
 		Location:    req.Location,
 		ContactInfo: req.ContactInfo,
+		Status:      "available", // Set initial status
+		College:     req.College, // Add college field
 	}
 
 	if err := db.Create(&product).Error; err != nil {
@@ -262,6 +309,7 @@ func createProduct(c *gin.Context) {
 		return
 	}
 
+	log.Printf("Product created successfully: %+v", product)
 	c.JSON(http.StatusCreated, product)
 }
 
@@ -391,6 +439,304 @@ func uploadImage(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"imageUrl": imageURL})
 }
 
+func getProductsByCollege(c *gin.Context) {
+	college := c.Query("college")
+
+	var products []models.Product
+	var result *gorm.DB
+
+	if college == "" {
+		// If no college is specified, return all available products
+		result = db.Where("status = ?", "available").Find(&products)
+	} else {
+		// If college is specified, filter by college
+		result = db.Table("products").
+			Select("products.*").
+			Joins("LEFT JOIN users ON products.user_id = users.id").
+			Where("users.college = ? AND products.status = ?", college, "available").
+			Find(&products)
+	}
+
+	if result.Error != nil {
+		log.Printf("Error fetching products: %v", result.Error)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch products"})
+		return
+	}
+
+	c.JSON(http.StatusOK, products)
+}
+
+// GetTransactions returns all transactions for the current user
+func GetTransactions(c *gin.Context) {
+	userID := c.GetUint("userID")
+	if userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var transactions []struct {
+		ID           uint      `json:"id"`
+		ProductTitle string    `json:"productTitle"`
+		Amount       float64   `json:"amount"`
+		Status       string    `json:"status"`
+		CreatedAt    time.Time `json:"createdAt"`
+	}
+
+	result := db.Table("transactions").
+		Select("transactions.id, products.title as product_title, transactions.amount, transactions.status, transactions.created_at").
+		Joins("LEFT JOIN products ON transactions.product_id = products.id").
+		Where("transactions.buyer_id = ? OR transactions.seller_id = ?", userID, userID).
+		Order("transactions.created_at DESC").
+		Find(&transactions)
+
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch transactions"})
+		return
+	}
+
+	c.JSON(http.StatusOK, transactions)
+}
+
+// CreateTransaction creates a new transaction
+func CreateTransaction(c *gin.Context) {
+	userID := c.GetUint("userID")
+	if userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var input struct {
+		ProductID uint    `json:"productId" binding:"required"`
+		Amount    float64 `json:"amount" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Start a transaction
+	tx := db.Begin()
+
+	// Get the product
+	var product models.Product
+	if err := tx.First(&product, input.ProductID).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+		return
+	}
+
+	// Check if product is available
+	if product.Status != "available" {
+		tx.Rollback()
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Product is not available"})
+		return
+	}
+
+	// Create the transaction
+	transaction := models.Transaction{
+		ProductID: input.ProductID,
+		BuyerID:   userID,
+		SellerID:  product.UserID,
+		Amount:    input.Amount,
+		Status:    "pending",
+	}
+
+	if err := tx.Create(&transaction).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create transaction"})
+		return
+	}
+
+	// Update product status
+	if err := tx.Model(&product).Update("status", "reserved").Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product status"})
+		return
+	}
+
+	// Commit the transaction
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction"})
+		return
+	}
+
+	c.JSON(http.StatusOK, transaction)
+}
+
+func getTransactions(c *gin.Context) {
+	// Get user ID from session cookie
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var transactions []struct {
+		ID           uint      `json:"id"`
+		ProductTitle string    `json:"productTitle"`
+		Amount       float64   `json:"amount"`
+		Status       string    `json:"status"`
+		CreatedAt    time.Time `json:"createdAt"`
+	}
+
+	result := db.Table("transactions").
+		Select("transactions.id, products.title as product_title, transactions.amount, transactions.status, transactions.created_at").
+		Joins("LEFT JOIN products ON transactions.product_id = products.id").
+		Where("transactions.buyer_id = ? OR transactions.seller_id = ?", userID, userID).
+		Order("transactions.created_at DESC").
+		Find(&transactions)
+
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch transactions"})
+		return
+	}
+
+	c.JSON(http.StatusOK, transactions)
+}
+
+func login(c *gin.Context) {
+	log.Println("Login request received")
+
+	var req LoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("Error binding login request: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	log.Printf("Login attempt for email: %s", req.Email)
+
+	// Extract college name from email
+	// Format: username@collegename.edu.in
+	emailParts := strings.Split(req.Email, "@")
+	if len(emailParts) != 2 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid email format"})
+		return
+	}
+
+	domainParts := strings.Split(emailParts[1], ".")
+	if len(domainParts) < 3 || domainParts[1] != "edu" || domainParts[2] != "in" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Email must be in the format username@collegename.edu.in"})
+		return
+	}
+
+	// Handle college names with multiple words (e.g., "indian-institute" -> "Indian Institute")
+	collegeName := strings.Title(strings.ReplaceAll(domainParts[0], "-", " "))
+	log.Printf("Extracted college name from email: %s", collegeName)
+
+	var user models.User
+	if result := db.Where("email = ?", req.Email).First(&user); result.Error != nil {
+		log.Printf("User not found for email: %s", req.Email)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+		log.Printf("Invalid password for email: %s", req.Email)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
+		return
+	}
+
+	if !user.IsVerified {
+		log.Printf("Unverified user attempt: %s", req.Email)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Please verify your email first"})
+		return
+	}
+
+	// Set user ID in session
+	c.Set("userID", user.ID)
+
+	// Return user data without sensitive information
+	userData := map[string]interface{}{
+		"id":         user.ID,
+		"email":      user.Email,
+		"name":       user.Name,
+		"college":    collegeName, // Use the extracted college name from email
+		"isVerified": user.IsVerified,
+	}
+
+	log.Printf("Successful login for user: %s with college: %s", user.Email, collegeName)
+	c.JSON(http.StatusOK, userData)
+}
+
+func seedDatabase() {
+	// Check if we already have products
+	var count int64
+	db.Model(&models.Product{}).Count(&count)
+	if count > 0 {
+		log.Println("Database already has products, skipping seed")
+		return
+	}
+
+	// Create a test user if it doesn't exist
+	var user models.User
+	if result := db.Where("email = ?", "test@example.com").First(&user); result.Error != nil {
+		user = models.User{
+			Email:      "test@example.com",
+			Password:   "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy", // password: 123456
+			Name:       "Test User",
+			College:    "Example College",
+			IsVerified: true,
+		}
+		if err := db.Create(&user).Error; err != nil {
+			log.Printf("Error creating test user: %v", err)
+			return
+		}
+		log.Println("Created test user")
+	}
+
+	// Create sample products
+	sampleProducts := []models.Product{
+		{
+			Title:       "Introduction to Computer Science Textbook",
+			Description: "Used textbook for CS101. Good condition with some highlighting.",
+			Price:       25.99,
+			Category:    "textbooks",
+			Condition:   "good",
+			ImageURL:    "/uploads/textbook.jpg",
+			UserID:      user.ID,
+			Status:      "available",
+			Location:    "Main Campus Library",
+			ContactInfo: "test@example.com",
+		},
+		{
+			Title:       "MacBook Pro 2019",
+			Description: "Selling my MacBook Pro. Works perfectly, just upgraded to a newer model.",
+			Price:       899.99,
+			Category:    "electronics",
+			Condition:   "like new",
+			ImageURL:    "/uploads/macbook.jpg",
+			UserID:      user.ID,
+			Status:      "available",
+			Location:    "Student Housing",
+			ContactInfo: "test@example.com",
+		},
+		{
+			Title:       "Desk Lamp",
+			Description: "LED desk lamp with adjustable brightness. Perfect for studying.",
+			Price:       15.50,
+			Category:    "furniture",
+			Condition:   "new",
+			ImageURL:    "/uploads/lamp.jpg",
+			UserID:      user.ID,
+			Status:      "available",
+			Location:    "Engineering Building",
+			ContactInfo: "test@example.com",
+		},
+	}
+
+	for _, product := range sampleProducts {
+		if err := db.Create(&product).Error; err != nil {
+			log.Printf("Error creating product: %v", err)
+			continue
+		}
+		log.Printf("Created product: %s", product.Title)
+	}
+
+	log.Println("Database seeding completed")
+}
+
 func main() {
 	r := gin.Default()
 
@@ -418,22 +764,28 @@ func main() {
 	})
 
 	// Auto migrate the schema
-	db.AutoMigrate(&models.User{}, &models.Product{})
+	db.AutoMigrate(&models.User{}, &models.Product{}, &models.Transaction{})
 
 	// Routes
-	r.POST("/signup", signup)
-	r.POST("/verify-otp", verifyOTP)
-	r.POST("/check-email", checkEmail)
+	r.POST("/api/signup", signup)
+	r.POST("/api/verify-otp", verifyOTP)
+	r.POST("/api/check-email", checkEmail)
+	r.POST("/api/login", login)
 
 	// Product routes
-	r.POST("/products", createProduct)
-	r.GET("/products/user", getUserProducts)
-	r.GET("/products/:id", getProduct)
-	r.PUT("/products/:id", updateProduct)
-	r.DELETE("/products/:id", deleteProduct)
+	r.POST("/api/products", createProduct)
+	r.GET("/api/products", getProductsByCollege)
+	r.GET("/api/products/user", getUserProducts)
+	r.GET("/api/products/:id", getProduct)
+	r.PUT("/api/products/:id", updateProduct)
+	r.DELETE("/api/products/:id", deleteProduct)
 
 	// File upload route
-	r.POST("/upload", uploadImage)
+	r.POST("/api/upload", uploadImage)
+
+	// Transaction endpoints
+	r.GET("/api/transactions", getTransactions)
+	r.POST("/api/transactions", CreateTransaction)
 
 	// Start server
 	if err := r.Run(":8080"); err != nil {

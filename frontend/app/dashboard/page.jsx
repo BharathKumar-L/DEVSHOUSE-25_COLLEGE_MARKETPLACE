@@ -19,25 +19,26 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [success, setSuccess] = useState("")
 
   useEffect(() => {
-    fetchUserProducts()
+    fetchProducts()
   }, [])
 
-  const fetchUserProducts = async () => {
+  const fetchProducts = async () => {
     try {
-      const response = await fetch("http://localhost:8080/products/user", {
-        credentials: "include",
+      setLoading(true)
+      const response = await fetch("http://localhost:8080/api/products/user", {
+        credentials: "include"
       })
-      
       if (!response.ok) {
         throw new Error("Failed to fetch products")
       }
-      
       const data = await response.json()
       setProducts(data)
-    } catch (err) {
-      setError(err.message)
+    } catch (error) {
+      console.error("Error fetching products:", error)
+      setError("Failed to load your products. Please try again later.")
     } finally {
       setLoading(false)
     }
@@ -62,24 +63,28 @@ export default function DashboardPage() {
       return
     }
 
+    if (!confirm("Are you sure you want to delete this product?")) {
+      return
+    }
+
     try {
-      console.log('Attempting to delete product:', productId)
-      const response = await fetch(`http://localhost:8080/products/${productId}`, {
+      setLoading(true)
+      const response = await fetch(`http://localhost:8080/api/products/${productId}`, {
         method: "DELETE",
-        credentials: "include",
+        credentials: "include"
       })
-      
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.error || "Failed to delete product")
       }
-      
-      // Remove the product from the state
       setProducts(products.filter(product => product.ID !== productId))
       setDeleteConfirm(null)
-    } catch (err) {
-      console.error('Delete error:', err)
-      setError(err.message)
+      setSuccess("Product deleted successfully!")
+    } catch (error) {
+      console.error("Error deleting product:", error)
+      setError(error.message || "Failed to delete product. Please try again later.")
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -148,6 +153,12 @@ export default function DashboardPage() {
                 {error && (
                   <div className="brutal-message-error mb-4">
                     <p className="brutal-text">{error}</p>
+                  </div>
+                )}
+
+                {success && (
+                  <div className="brutal-message-success mb-4">
+                    <p className="brutal-text">{success}</p>
                   </div>
                 )}
 

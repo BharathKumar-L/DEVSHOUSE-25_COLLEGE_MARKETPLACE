@@ -7,7 +7,7 @@ import { Menu, X, User } from "lucide-react"
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
-  const { user, collegeName, logout } = useAuth()
+  const { user, logout } = useAuth()
 
   return (
     <nav className="bg-white brutal-border-b brutal-shadow fixed top-0 left-0 right-0 z-50">
@@ -17,7 +17,7 @@ export default function Navbar() {
             <div className="flex flex-shrink-0 items-center">
               <Link href="/" className="flex items-center gap-2">
                 <span className="brutal-heading-2">
-                  {collegeName ? `${collegeName} Marketplace` : "College Marketplace"}
+                  {user?.college ? `${user.college} Marketplace` : "College Marketplace"}
                 </span>
               </Link>
             </div>

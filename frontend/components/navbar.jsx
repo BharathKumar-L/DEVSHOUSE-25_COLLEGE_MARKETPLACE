@@ -4,11 +4,37 @@ import { useState } from "react"
 import Link from "next/link"
 import { Menu, X, ShoppingBag, MessageCircle, LogOut, User, Settings, HelpCircle } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
+import { useRouter } from 'next/navigation'
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
   const [isProfileOpen, setIsProfileOpen] = useState(false)
-  const { isAuthenticated, logout, user, collegeName } = useAuth()
+  const { isAuthenticated, logout, user } = useAuth()
+  const router = useRouter()
+
+  const handleLogout = () => {
+    logout()
+    router.push('/auth')
+  }
+
+  // Extract college name from email
+  const getCollegeName = () => {
+    if (user?.email) {
+      const emailParts = user.email.split('@')
+      if (emailParts.length === 2) {
+        const domainParts = emailParts[1].split('.')
+        if (domainParts.length >= 3 && domainParts[1] === 'edu' && domainParts[2] === 'in') {
+          // Handle college names with multiple words (e.g., "indian-institute" -> "Indian Institute")
+          const collegeName = domainParts[0]
+            .split('-')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ')
+          return collegeName
+        }
+      }
+    }
+    return "College"
+  }
 
   return (
     <header className="fixed top-0 z-50 w-full border-b-4 border-black bg-white shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] mb-24">
@@ -19,7 +45,7 @@ export default function Navbar() {
               <ShoppingBag className="h-8 w-8 text-black" />
             </div>
             <span className="brutal-heading-2 tracking-tight">
-              {collegeName ? `${collegeName} Marketplace` : "College Marketplace"}
+              {getCollegeName()} Marketplace
             </span>
           </Link>
 
@@ -88,10 +114,7 @@ export default function Navbar() {
                         </div>
                       </Link>
                       <button
-                        onClick={() => {
-                          logout()
-                          setIsProfileOpen(false)
-                        }}
+                        onClick={handleLogout}
                         className="brutal-button-danger w-full hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]"
                       >
                         <div className="flex items-center gap-2">
@@ -165,10 +188,7 @@ export default function Navbar() {
                   Profile
                 </Link>
                 <button
-                  onClick={() => {
-                    logout()
-                    setIsOpen(false)
-                  }}
+                  onClick={handleLogout}
                   className="brutal-button-danger hover:shadow-[6px_6px_0px_0px_rgba(0px,0px,0px,1)]"
                 >
                   Logout

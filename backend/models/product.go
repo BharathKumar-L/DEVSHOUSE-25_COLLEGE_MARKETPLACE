@@ -17,4 +17,5 @@ type Product struct {
 	Status      string `gorm:"default:'available'"` // available, sold, reserved
 	Location    string
 	ContactInfo string
+	College     string `gorm:"not null"` // College name for the product
 }
